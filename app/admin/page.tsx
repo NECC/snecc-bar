@@ -582,38 +582,25 @@ function AdminPageContent() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col gap-4 mb-6 sm:mb-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">Admin Backoffice</h1>
-              <p className="text-slate-400 text-sm sm:text-base">SNecc-Bar Management System</p>
-            </div>
-            <div className="hidden sm:block text-right">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 sm:mb-8 gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">Admin Backoffice</h1>
+            <p className="text-slate-400 text-sm sm:text-base">SNecc-Bar Management System</p>
+          </div>
+          <div className="flex items-center gap-4 w-full sm:w-auto">
+            <div className="text-right flex-1 sm:flex-none">
               <p className="text-sm text-slate-400">Logged in as</p>
               <p className="text-white font-medium">{currentUser.name}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
-            <div className="text-right flex-1 sm:hidden">
-              <p className="text-xs text-slate-400">Logged in as</p>
-              <p className="text-white font-medium text-sm truncate">{currentUser.name}</p>
             </div>
             <Button 
               onClick={() => router.push("/")} 
               variant="outline" 
-              size="sm"
-              className="gap-1.5 sm:gap-2 bg-slate-700 hover:bg-slate-600 text-white border-slate-600 text-xs sm:text-sm flex-shrink-0"
+              className="gap-2 bg-slate-700 hover:bg-slate-600 text-white border-slate-600 text-sm"
             >
               <Home className="w-4 h-4" />
-              <span className="hidden sm:inline">Página Principal</span>
-              <span className="sm:hidden">Principal</span>
+              Página Principal
             </Button>
-            <Button 
-              onClick={handleLogout} 
-              variant="outline" 
-              size="sm"
-              className="gap-1.5 sm:gap-2 bg-transparent border-slate-600 text-white hover:bg-slate-700 text-xs sm:text-sm flex-shrink-0"
-            >
+            <Button onClick={handleLogout} variant="outline" className="gap-2 bg-transparent border-slate-600 text-white hover:bg-slate-700 text-sm">
               <LogOut className="w-4 h-4" />
               Logout
             </Button>
@@ -666,15 +653,13 @@ function AdminPageContent() {
 
         {/* Tabs */}
         <Tabs defaultValue="users" className="space-y-4 sm:space-y-6">
-          <div className="overflow-x-auto hide-scrollbar">
-            <TabsList className="bg-slate-800 border-slate-700 inline-flex w-full sm:grid sm:grid-cols-5 min-w-max sm:min-w-0">
-              <TabsTrigger value="users" className="text-xs sm:text-sm whitespace-nowrap flex-shrink-0">Users</TabsTrigger>
-              <TabsTrigger value="transactions" className="text-xs sm:text-sm whitespace-nowrap flex-shrink-0">Transactions</TabsTrigger>
-              <TabsTrigger value="balance" className="text-xs sm:text-sm whitespace-nowrap flex-shrink-0">Balance</TabsTrigger>
-              <TabsTrigger value="stock" className="text-xs sm:text-sm whitespace-nowrap flex-shrink-0">Stock</TabsTrigger>
-              <TabsTrigger value="Necc" className="text-xs sm:text-sm whitespace-nowrap flex-shrink-0">Financeiro</TabsTrigger>
-            </TabsList>
-          </div>
+          <TabsList className="bg-slate-800 border-slate-700 grid grid-cols-2 sm:grid-cols-5 w-full">
+            <TabsTrigger value="users" className="text-xs sm:text-sm">Users</TabsTrigger>
+            <TabsTrigger value="transactions" className="text-xs sm:text-sm">Transactions</TabsTrigger>
+            <TabsTrigger value="balance" className="text-xs sm:text-sm">Balance</TabsTrigger>
+            <TabsTrigger value="stock" className="text-xs sm:text-sm">Stock</TabsTrigger>
+            <TabsTrigger value="Necc" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
+          </TabsList>
 
           {/* Users Tab */}
           <TabsContent value="users">

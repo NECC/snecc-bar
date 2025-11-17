@@ -147,11 +147,3 @@
 .zoom-in-95 {
   animation: zoom-in-95 0.3s ease-out;
 }
-
-/* Text truncation utilities */
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}

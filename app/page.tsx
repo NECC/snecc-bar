@@ -330,136 +330,93 @@ function VendingMachineContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-cyan-50 flex flex-col">
-      {/* Header Fixo */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-lg border-b border-slate-200 shadow-sm">
-        <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 sm:h-20">
-            <div className="flex items-center gap-4">
-              <img src="/favicon.ico" alt="NECC Logo" className="w-12 h-12 sm:w-16 sm:h-16" />
-              <div>
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-                  sNECC-Bar
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-500 hidden sm:block">Máquina de venda automática</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsPopupOpen(true)}
-                className="h-10 w-10 hover:bg-slate-100"
-              >
-                <User className="w-5 h-5" />
-              </Button>
-              <Button
-                ref={cartButtonRef}
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsCheckoutOpen(true)}
-                className="relative h-10 w-10 hover:bg-slate-100"
-              >
-                <ShoppingCart className="w-5 h-5" />
-                {getTotalItems() > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shadow-lg">
-                    {getTotalItems()}
-                  </span>
-                )}
-              </Button>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-cyan-900 to-slate-900 p-4 sm:p-8 flex items-center justify-center relative">
+      <Card className="bg-gradient-to-br from-cyan-500 to-cyan-600 p-4 sm:p-8 rounded-3xl shadow-2xl max-w-4xl w-full border-0 backdrop-blur-sm">
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-5 mb-6 flex items-center justify-between shadow-lg border border-slate-700/50">
+          <div>
+            <h1 className="text-cyan-400 text-2xl sm:text-3xl font-bold tracking-tight">Bem vindo ao sNECC-Bar</h1>
+            <p className="text-slate-400 text-sm mt-1">Escolha os seus produtos favoritos</p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20 shadow-lg">
+            <img src="/favicon.ico" alt="NECC Logo" className="w-8 h-8" />
           </div>
         </div>
-      </header>
 
-      {/* Layout Principal - Produtos ocupam todo o espaço */}
-      <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1920px] mx-auto w-full flex flex-col">
-        <main className="flex-1 flex flex-col">
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-4 sm:p-6 lg:p-8 flex-1 flex flex-col min-h-[calc(100vh-12rem)]">
-            <div className="mb-4 sm:mb-6">
-              <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-900 mb-1">Produtos Disponíveis</h2>
-              <p className="text-sm text-slate-500">Clique para adicionar ao carrinho</p>
-            </div>
-            
-            {dynamicProducts.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center py-16">
-                  <ShoppingCart className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                  <p className="text-slate-500 text-lg">Nenhum produto disponível</p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3 sm:gap-4 lg:gap-6 content-start">
-                {dynamicProducts.map((product) => (
-                  <div
-                    key={product.id}
-                    className="group relative"
-                  >
-                    <button
-                      onClick={(e) => handleProductClick(product, e)}
-                      disabled={product.stock <= 0}
-                      className={`w-full relative bg-white rounded-xl border-2 transition-all duration-300 overflow-hidden ${
-                        product.stock <= 0
-                          ? 'border-slate-200 opacity-50 cursor-not-allowed'
-                          : 'border-slate-200 hover:border-cyan-400 hover:shadow-xl hover:-translate-y-1 active:scale-95'
-                      }`}
-                    >
-                      {/* Stock Badge */}
-                      {product.stock > 0 && product.stock < 5 && (
-                        <div className="absolute top-2 right-2 z-10 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-md">
-                          {product.stock} restantes
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 sm:p-10 shadow-xl border border-white/20">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-6">
+            {dynamicProducts.map((product) => (
+              <div key={product.id} className="flex flex-col items-center group">
+                <button
+                  onClick={(e) => handleProductClick(product, e)}
+                  className={`relative border-4 rounded-2xl p-3 sm:p-5 bg-white w-full aspect-square flex items-center justify-center mb-3 transition-all duration-300 cursor-pointer transform hover:scale-105 hover:-translate-y-1 shadow-lg hover:shadow-2xl ${
+                    product.stock <= 0 
+                      ? 'cursor-not-allowed border-red-300 opacity-60' 
+                      : 'border-cyan-300 hover:border-cyan-500 active:scale-95'
+                  }`}
+                  disabled={product.stock <= 0}
+                >
+                  {product.stock <= 0 ? (
+                    <div className="flex flex-col items-center justify-center">
+                      <XCircle className="w-10 h-10 sm:w-12 sm:h-12 text-red-500 mb-2" />
+                      <span className="text-xs sm:text-sm text-red-500 font-semibold">Sem Stock</span>
+                    </div>
+                  ) : (
+                    <>
+                      <img
+                        src={product.image || "/placeholder.svg"}
+                        alt={product.name}
+                        className="max-w-full max-h-full object-contain transition-transform duration-300 group-hover:scale-110"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          if (!target.dataset.fallbackAttempted && !target.src.includes('placeholder.svg') && !target.src.includes('data:image')) {
+                            target.dataset.fallbackAttempted = 'true'
+                            target.src = '/placeholder.svg'
+                          } else if (!target.src.includes('data:image')) {
+                            target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2U1ZTdlYiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTYiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='
+                          }
+                        }}
+                      />
+                      {product.stock < 5 && product.stock > 0 && (
+                        <div className="absolute top-1 right-1 bg-yellow-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
+                          {product.stock}
                         </div>
                       )}
-                      
-                      {/* Out of Stock Overlay */}
-                      {product.stock <= 0 && (
-                        <div className="absolute inset-0 bg-slate-100/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
-                          <XCircle className="w-10 h-10 text-red-500 mb-2" />
-                          <span className="text-xs font-semibold text-red-600">Sem Stock</span>
-                        </div>
-                      )}
-
-                      {/* Product Image */}
-                      <div className="aspect-square p-4 sm:p-6 flex items-center justify-center bg-gradient-to-br from-slate-50 to-white">
-                        <img
-                          src={product.image || "/placeholder.svg"}
-                          alt={product.name}
-                          className="max-w-full max-h-full object-contain transition-transform duration-300 group-hover:scale-110"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            if (!target.dataset.fallbackAttempted && !target.src.includes('placeholder.svg') && !target.src.includes('data:image')) {
-                              target.dataset.fallbackAttempted = 'true'
-                              target.src = '/placeholder.svg'
-                            } else if (!target.src.includes('data:image')) {
-                              target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2U1ZTdlYiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTYiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='
-                            }
-                          }}
-                        />
-                      </div>
-
-                      {/* Product Info */}
-                      <div className="p-3 sm:p-4 border-t border-slate-100">
-                        <h3 className="text-xs sm:text-sm font-semibold text-slate-900 mb-2 line-clamp-2 min-h-[2.5rem]">
-                          {product.name}
-                        </h3>
-                        <div className="flex items-center justify-between">
-                          <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
-                            €{product.price.toFixed(2)}
-                          </span>
-                          {product.stock > 0 && (
-                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-                ))}
+                    </>
+                  )}
+                </button>
+                <span className="text-sm sm:text-base text-slate-800 font-bold bg-cyan-50 px-3 py-1 rounded-full">
+                  €{product.price.toFixed(2)}
+                </span>
               </div>
-            )}
+            ))}
           </div>
-        </main>
-      </div>
+        </div>
+
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-5 mt-6 flex items-center justify-center gap-6 shadow-lg border border-slate-700/50">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsPopupOpen(true)}
+            className="text-cyan-400 hover:text-cyan-300 hover:bg-slate-700/50 rounded-xl transition-all duration-300 h-12 w-12"
+          >
+            <User className="w-6 h-6" />
+          </Button>
+          <Button
+            ref={cartButtonRef}
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsCheckoutOpen(true)}
+            className="text-cyan-400 hover:text-cyan-300 hover:bg-slate-700/50 rounded-xl transition-all duration-300 h-12 w-12 relative"
+          >
+            <ShoppingCart className="w-6 h-6" />
+            {getTotalItems() > 0 && (
+              <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg animate-pulse">
+                {getTotalItems()}
+              </span>
+            )}
+          </Button>
+        </div>
+      </Card>
 
       {animatingProducts.map((animProduct) => (
         <div
