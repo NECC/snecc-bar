@@ -330,82 +330,136 @@ function VendingMachineContent() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-200 p-4 sm:p-8 flex items-center justify-center relative">
-      <Card className="bg-cyan-500 p-4 sm:p-8 rounded-3xl shadow-2xl max-w-2xl w-full">
-        <div className="bg-neutral-900 rounded-2xl p-4 mb-6 flex items-center justify-between">
-          <h1 className="text-cyan-400 text-xl font-semibold">Bem vindo ao sNECC-Bar</h1>
-          <div className="bg-white rounded-lg p-2">
-            <img src="/favicon.ico" alt="NECC Logo" className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 sm:p-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-            {dynamicProducts.map((product) => (
-              <div key={product.id} className="flex flex-col items-center">
-                <button
-                  onClick={(e) => handleProductClick(product, e)}
-                  className={`border-4 border-neutral-300 rounded-xl p-2 sm:p-4 bg-white w-24 h-24 sm:w-32 sm:h-32 flex items-center justify-center mb-2 hover:border-cyan-400 hover:shadow-lg transition-all cursor-pointer active:scale-95 ${
-                    product.stock <= 0 ? 'cursor-not-allowed' : ''
-                  }`}
-                  disabled={product.stock <= 0}
-                >
-                  {product.stock <= 0 ? (
-                    <div className="flex flex-col items-center justify-center">
-                      <XCircle className="w-12 h-12 sm:w-8 sm:h-8 text-red-500 mb-1" />
-                      <span className="text-sm sm:text-xs text-red-500 font-medium">Out of Stock</span>
-                    </div>
-                  ) : (
-                    <img
-                      src={product.image || "/placeholder.svg"}
-                      alt={product.name}
-                      className="max-w-full max-h-full object-contain"
-                      onError={(e) => {
-                        // Fallback to placeholder if image fails to load
-                        const target = e.target as HTMLImageElement
-                        // Prevent infinite loop by checking if we've already tried the placeholder
-                        if (!target.dataset.fallbackAttempted && !target.src.includes('placeholder.svg') && !target.src.includes('data:image')) {
-                          target.dataset.fallbackAttempted = 'true'
-                          target.src = '/placeholder.svg'
-                        } else if (!target.src.includes('data:image')) {
-                          // If placeholder also fails, use a data URI as last resort
-                          target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2U1ZTdlYiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTYiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='
-                        }
-                      }}
-                    />
-                  )}
-                </button>
-                <span className="text-sm text-cyan-600 font-medium">€{product.price.toFixed(2)}</span>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-cyan-50 flex flex-col">
+      {/* Header Fixo */}
+      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-lg border-b border-slate-200 shadow-sm">
+        <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16 sm:h-20">
+            <div className="flex items-center gap-4">
+              <img src="/favicon.ico" alt="NECC Logo" className="w-12 h-12 sm:w-16 sm:h-16" />
+              <div>
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+                  sNECC-Bar
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-500 hidden sm:block">Máquina de venda automática</p>
               </div>
-            ))}
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsPopupOpen(true)}
+                className="h-10 w-10 hover:bg-slate-100"
+              >
+                <User className="w-5 h-5" />
+              </Button>
+              <Button
+                ref={cartButtonRef}
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsCheckoutOpen(true)}
+                className="relative h-10 w-10 hover:bg-slate-100"
+              >
+                <ShoppingCart className="w-5 h-5" />
+                {getTotalItems() > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shadow-lg">
+                    {getTotalItems()}
+                  </span>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
+      </header>
 
-        <div className="bg-neutral-900 rounded-2xl p-4 mt-6 flex items-center justify-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsPopupOpen(true)}
-            className="text-cyan-400 hover:text-cyan-300 hover:bg-neutral-800"
-          >
-            <User className="w-6 h-6" />
-          </Button>
-          <Button
-            ref={cartButtonRef}
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsCheckoutOpen(true)}
-            className="text-cyan-400 hover:text-cyan-300 hover:bg-neutral-800 relative"
-          >
-            <ShoppingCart className="w-6 h-6" />
-            {getTotalItems() > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-                {getTotalItems()}
-              </span>
+      {/* Layout Principal - Produtos ocupam todo o espaço */}
+      <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1920px] mx-auto w-full flex flex-col">
+        <main className="flex-1 flex flex-col">
+          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-4 sm:p-6 lg:p-8 flex-1 flex flex-col min-h-[calc(100vh-12rem)]">
+            <div className="mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-900 mb-1">Produtos Disponíveis</h2>
+              <p className="text-sm text-slate-500">Clique para adicionar ao carrinho</p>
+            </div>
+            
+            {dynamicProducts.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center py-16">
+                  <ShoppingCart className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-500 text-lg">Nenhum produto disponível</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3 sm:gap-4 lg:gap-6 content-start">
+                {dynamicProducts.map((product) => (
+                  <div
+                    key={product.id}
+                    className="group relative"
+                  >
+                    <button
+                      onClick={(e) => handleProductClick(product, e)}
+                      disabled={product.stock <= 0}
+                      className={`w-full relative bg-white rounded-xl border-2 transition-all duration-300 overflow-hidden ${
+                        product.stock <= 0
+                          ? 'border-slate-200 opacity-50 cursor-not-allowed'
+                          : 'border-slate-200 hover:border-cyan-400 hover:shadow-xl hover:-translate-y-1 active:scale-95'
+                      }`}
+                    >
+                      {/* Stock Badge */}
+                      {product.stock > 0 && product.stock < 5 && (
+                        <div className="absolute top-2 right-2 z-10 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-md">
+                          {product.stock} restantes
+                        </div>
+                      )}
+                      
+                      {/* Out of Stock Overlay */}
+                      {product.stock <= 0 && (
+                        <div className="absolute inset-0 bg-slate-100/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
+                          <XCircle className="w-10 h-10 text-red-500 mb-2" />
+                          <span className="text-xs font-semibold text-red-600">Sem Stock</span>
+                        </div>
+                      )}
+
+                      {/* Product Image */}
+                      <div className="aspect-square p-4 sm:p-6 flex items-center justify-center bg-gradient-to-br from-slate-50 to-white">
+                        <img
+                          src={product.image || "/placeholder.svg"}
+                          alt={product.name}
+                          className="max-w-full max-h-full object-contain transition-transform duration-300 group-hover:scale-110"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            if (!target.dataset.fallbackAttempted && !target.src.includes('placeholder.svg') && !target.src.includes('data:image')) {
+                              target.dataset.fallbackAttempted = 'true'
+                              target.src = '/placeholder.svg'
+                            } else if (!target.src.includes('data:image')) {
+                              target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2U1ZTdlYiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTYiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='
+                            }
+                          }}
+                        />
+                      </div>
+
+                      {/* Product Info */}
+                      <div className="p-3 sm:p-4 border-t border-slate-100">
+                        <h3 className="text-xs sm:text-sm font-semibold text-slate-900 mb-2 line-clamp-2 min-h-[2.5rem]">
+                          {product.name}
+                        </h3>
+                        <div className="flex items-center justify-between">
+                          <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
+                            €{product.price.toFixed(2)}
+                          </span>
+                          {product.stock > 0 && (
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
-          </Button>
-        </div>
-      </Card>
+          </div>
+        </main>
+      </div>
 
       {animatingProducts.map((animProduct) => (
         <div
@@ -427,39 +481,40 @@ function VendingMachineContent() {
 
       {isPopupOpen && (
         <>
-          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setIsPopupOpen(false)} />
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-in fade-in duration-200" onClick={() => setIsPopupOpen(false)} />
 
-          <Card className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-4 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md z-50">
+          <Card className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-white to-slate-50 p-6 sm:p-10 rounded-3xl shadow-2xl w-full max-w-md z-50 border-0 animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setIsPopupOpen(false)}
-              className="absolute top-4 right-4 text-neutral-500 hover:text-neutral-700"
+              className="absolute top-4 right-4 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-all"
             >
               <X className="w-5 h-5" />
             </Button>
 
-            <h2 className="text-cyan-500 text-3xl font-bold text-center mb-6">Área do aluno</h2>
+            <h2 className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-blue-600 text-3xl sm:text-4xl font-bold text-center mb-2">Área do aluno</h2>
+            <p className="text-slate-500 text-sm text-center mb-8">Gerencie a sua conta e histórico</p>
 
-            <div className="flex items-center gap-4 mb-6">
-              <div className="bg-blue-500 rounded-full p-3">
+            <div className="flex items-center gap-4 mb-6 p-4 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-2xl border border-cyan-100">
+              <div className="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full p-4 shadow-lg">
                 <User className="w-8 h-8 text-white" />
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-neutral-800 text-lg">{currentUser?.name || "Guest"}</p>
+                <p className="font-bold text-slate-800 text-lg">{currentUser?.name || "Guest"}</p>
                 {currentUser?.email && (
-                  <p className="text-neutral-600 text-sm">{currentUser.email}</p>
+                  <p className="text-slate-600 text-sm">{currentUser.email}</p>
                 )}
-                <p className="text-cyan-500 font-medium mt-1">
-                  Balance: €{currentUser?.balance !== undefined ? currentUser.balance.toFixed(2) : "0.00"}
+                <p className="text-cyan-600 font-bold mt-2 text-lg">
+                  €{currentUser?.balance !== undefined ? currentUser.balance.toFixed(2) : "0.00"}
                 </p>
                 {currentUser && (
-                  <div className="mt-2 flex items-center gap-2 text-xs text-neutral-500">
-                    <span className={`px-2 py-1 rounded ${currentUser.isMember ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                  <div className="mt-3 flex items-center gap-2 flex-wrap">
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${currentUser.isMember ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-slate-100 text-slate-700 border border-slate-200'}`}>
                       {currentUser.isMember ? 'Membro NECC' : 'Não Membro'}
                     </span>
                     {currentUser.createdAt && (
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1 text-xs text-slate-500 bg-white px-2 py-1 rounded-full">
                         <Calendar className="w-3 h-3" />
                         {new Date(currentUser.createdAt).toLocaleDateString('pt-PT')}
                       </span>
@@ -471,25 +526,25 @@ function VendingMachineContent() {
 
             {currentUser && (
               <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="bg-cyan-50 rounded-lg p-3 text-center">
-                  <p className="text-xs text-neutral-600 mb-1">Total Gasto</p>
-                  <p className="text-lg font-bold text-cyan-600">
+                <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl p-4 text-center border border-cyan-200 shadow-sm">
+                  <p className="text-xs text-slate-600 mb-2 font-medium">Total Gasto</p>
+                  <p className="text-xl font-bold text-cyan-600">
                     €{userOrders.reduce((sum, o) => sum + o.total, 0).toFixed(2)}
                   </p>
                 </div>
-                <div className="bg-cyan-50 rounded-lg p-3 text-center">
-                  <p className="text-xs text-neutral-600 mb-1">Encomendas</p>
-                  <p className="text-lg font-bold text-cyan-600">{userOrders.length}</p>
+                <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl p-4 text-center border border-cyan-200 shadow-sm">
+                  <p className="text-xs text-slate-600 mb-2 font-medium">Encomendas</p>
+                  <p className="text-xl font-bold text-cyan-600">{userOrders.length}</p>
                 </div>
-                <div className="bg-green-50 rounded-lg p-3 text-center">
-                  <p className="text-xs text-neutral-600 mb-1">Total Depositado</p>
-                  <p className="text-lg font-bold text-green-600">
+                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 text-center border border-green-200 shadow-sm">
+                  <p className="text-xs text-slate-600 mb-2 font-medium">Total Depositado</p>
+                  <p className="text-xl font-bold text-green-600">
                     €{userDeposits.reduce((sum, d) => sum + d.amount, 0).toFixed(2)}
                   </p>
                 </div>
-                <div className="bg-green-50 rounded-lg p-3 text-center">
-                  <p className="text-xs text-neutral-600 mb-1">Depósitos</p>
-                  <p className="text-lg font-bold text-green-600">{userDeposits.length}</p>
+                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 text-center border border-green-200 shadow-sm">
+                  <p className="text-xs text-slate-600 mb-2 font-medium">Depósitos</p>
+                  <p className="text-xl font-bold text-green-600">{userDeposits.length}</p>
                 </div>
               </div>
             )}
@@ -497,26 +552,26 @@ function VendingMachineContent() {
             {currentUser && (
               <div className="mt-4">
                 <Tabs defaultValue="orders" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 bg-neutral-200">
-                    <TabsTrigger value="orders" className="text-xs sm:text-sm text-neutral-800 data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
+                  <TabsList className="grid w-full grid-cols-2 bg-slate-100 rounded-xl p-1">
+                    <TabsTrigger value="orders" className="text-xs sm:text-sm text-slate-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-600 data-[state=active]:text-white rounded-lg transition-all">
                       <History className="w-3 h-3 mr-1" />
                       Encomendas ({userOrders.length})
                     </TabsTrigger>
-                    <TabsTrigger value="deposits" className="text-xs sm:text-sm text-neutral-800 data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
+                    <TabsTrigger value="deposits" className="text-xs sm:text-sm text-slate-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-600 data-[state=active]:text-white rounded-lg transition-all">
                       <TrendingUp className="w-3 h-3 mr-1" />
                       Depósitos ({userDeposits.length})
                     </TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="orders" className="mt-3">
-                    <div className="max-h-64 overflow-y-auto space-y-1.5">
+                    <div className="max-h-64 overflow-y-auto space-y-2 hide-scrollbar">
                       {userOrders.length === 0 ? (
-                        <p className="text-xs text-neutral-500 text-center py-4">Nenhuma encomenda ainda</p>
+                        <p className="text-sm text-slate-500 text-center py-8 bg-slate-50 rounded-xl">Nenhuma encomenda ainda</p>
                       ) : (
                         userOrders.slice(0, 10).map((order) => (
-                          <div key={order.id} className="bg-neutral-50 rounded-lg p-2.5 text-xs border border-neutral-200">
+                          <div key={order.id} className="bg-gradient-to-r from-slate-50 to-white rounded-xl p-3 text-xs border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex justify-between items-center mb-1">
-                              <span className="text-neutral-600 font-medium">
+                              <span className="text-slate-600 font-semibold">
                                 {new Date(order.timestamp).toLocaleDateString('pt-PT', { 
                                   day: '2-digit', 
                                   month: '2-digit',
@@ -524,9 +579,9 @@ function VendingMachineContent() {
                                   minute: '2-digit'
                                 })}
                               </span>
-                              <span className="font-bold text-cyan-600">€{order.total.toFixed(2)}</span>
+                              <span className="font-bold text-cyan-600 text-sm">€{order.total.toFixed(2)}</span>
                             </div>
-                            <div className="text-neutral-500 truncate">
+                            <div className="text-slate-500 truncate mb-1">
                               {order.items.map((item, idx) => (
                                 <span key={idx}>
                                   {item.productName} x{item.quantity}
@@ -534,14 +589,14 @@ function VendingMachineContent() {
                                 </span>
                               ))}
                             </div>
-                            <div className="text-neutral-400 mt-0.5">
-                              {order.paymentMethod === 'balance' ? 'Saldo' : 'Dinheiro'}
+                            <div className="text-slate-400 text-xs">
+                              {order.paymentMethod === 'balance' ? '💳 Saldo' : '💵 Dinheiro'}
                             </div>
                           </div>
                         ))
                       )}
                       {userOrders.length > 10 && (
-                        <p className="text-xs text-neutral-400 text-center pt-1">
+                        <p className="text-xs text-slate-400 text-center pt-2">
                           Mostrando últimas 10 de {userOrders.length}
                         </p>
                       )}
@@ -549,14 +604,14 @@ function VendingMachineContent() {
                   </TabsContent>
                   
                   <TabsContent value="deposits" className="mt-3">
-                    <div className="max-h-64 overflow-y-auto space-y-1.5">
+                    <div className="max-h-64 overflow-y-auto space-y-2 hide-scrollbar">
                       {userDeposits.length === 0 ? (
-                        <p className="text-xs text-neutral-500 text-center py-4">Nenhum depósito registado</p>
+                        <p className="text-sm text-slate-500 text-center py-8 bg-slate-50 rounded-xl">Nenhum depósito registado</p>
                       ) : (
                         userDeposits.slice(0, 10).map((deposit) => (
-                          <div key={deposit.id} className="bg-neutral-50 rounded-lg p-2.5 text-xs border border-neutral-200">
+                          <div key={deposit.id} className="bg-gradient-to-r from-slate-50 to-white rounded-xl p-3 text-xs border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex justify-between items-center mb-1">
-                              <span className="text-neutral-600 font-medium">
+                              <span className="text-slate-600 font-semibold">
                                 {new Date(deposit.timestamp).toLocaleDateString('pt-PT', { 
                                   day: '2-digit', 
                                   month: '2-digit',
@@ -564,18 +619,18 @@ function VendingMachineContent() {
                                   minute: '2-digit'
                                 })}
                               </span>
-                              <span className={`font-bold ${deposit.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              <span className={`font-bold text-sm ${deposit.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                 {deposit.amount >= 0 ? '+' : ''}€{deposit.amount.toFixed(2)}
                               </span>
                             </div>
-                            <div className="text-neutral-400">
-                              {deposit.method === 'cash' ? 'Dinheiro' : deposit.method === 'mbway' ? 'MB Way' : 'Ajuste'}
+                            <div className="text-slate-400 text-xs">
+                              {deposit.method === 'cash' ? '💵 Dinheiro' : deposit.method === 'mbway' ? '📱 MB Way' : '⚙️ Ajuste'}
                             </div>
                           </div>
                         ))
                       )}
                       {userDeposits.length > 10 && (
-                        <p className="text-xs text-neutral-400 text-center pt-1">
+                        <p className="text-xs text-slate-400 text-center pt-2">
                           Mostrando últimos 10 de {userDeposits.length}
                         </p>
                       )}
@@ -586,28 +641,28 @@ function VendingMachineContent() {
             )}
 
             {currentUser ? (
-              <div className="space-y-3 mt-4">
+              <div className="space-y-3 mt-6">
                 {currentUser.role === "admin" && (
                   <Button
                     onClick={() => {
                       setIsPopupOpen(false)
                       router.push("/admin")
                     }}
-                    className="w-full bg-purple-500 hover:bg-purple-600 text-white"
+                    className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-lg rounded-xl py-6 text-lg font-semibold transition-all"
                   >
                     Admin Panel
                   </Button>
                 )}
-                <Button onClick={handleLogout} className="w-full bg-red-500 hover:bg-red-600 text-white">
+                <Button onClick={handleLogout} className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg rounded-xl py-6 text-lg font-semibold transition-all">
                   Logout
                 </Button>
               </div>
             ) : (
-              <div className="flex gap-3 mt-4">
-                <Button onClick={handleLogin} className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-white">
+              <div className="flex gap-3 mt-6">
+                <Button onClick={handleLogin} className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-lg rounded-xl py-6 text-base font-semibold transition-all">
                   Login
                 </Button>
-                <Button onClick={handleRegister} className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-white">
+                <Button onClick={handleRegister} className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-lg rounded-xl py-6 text-base font-semibold transition-all">
                   Register
                 </Button>
               </div>
@@ -618,68 +673,67 @@ function VendingMachineContent() {
 
       {isCheckoutOpen && (
         <>
-          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setIsCheckoutOpen(false)} />
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-in fade-in duration-200" onClick={() => setIsCheckoutOpen(false)} />
 
-          <Card className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-4 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md sm:w-[500px] max-h-[80vh] overflow-y-auto z-50">
+          <Card className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-white to-slate-50 p-6 sm:p-10 rounded-3xl shadow-2xl w-full max-w-md sm:w-[500px] max-h-[80vh] overflow-y-auto z-50 border-0 animate-in zoom-in-95 duration-300">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setIsCheckoutOpen(false)}
-              className="absolute top-4 right-4 text-neutral-500 hover:text-neutral-700"
+              className="absolute top-4 right-4 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-all"
             >
               <X className="w-5 h-5" />
             </Button>
 
-            <h2 className="text-cyan-500 text-3xl font-bold text-center mb-6">Checkout</h2>
+            <h2 className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-blue-600 text-3xl sm:text-4xl font-bold text-center mb-2">Checkout</h2>
+            <p className="text-slate-500 text-sm text-center mb-8">Revise os seus produtos</p>
 
             {cart.length === 0 ? (
-              <div className="text-center py-12">
-                <ShoppingCart className="w-16 h-16 text-neutral-300 mx-auto mb-4" />
-                <p className="text-neutral-500 text-lg">Your cart is empty</p>
-                <p className="text-neutral-400 text-sm mt-2">Add some products to get started</p>
+              <div className="text-center py-16">
+                <ShoppingCart className="w-20 h-20 text-slate-300 mx-auto mb-4" />
+                <p className="text-slate-600 text-xl font-semibold">O seu carrinho está vazio</p>
+                <p className="text-slate-400 text-sm mt-2">Adicione alguns produtos para começar</p>
               </div>
             ) : (
               <>
-                <div className="space-y-4 mb-6">
+                <div className="space-y-3 mb-6">
                   {cart.map((item) => (
                     <div
                       key={item.product.id}
-                      className="flex items-center gap-4 p-4 border-2 border-neutral-200 rounded-xl"
+                      className="flex items-center gap-4 p-4 bg-gradient-to-r from-slate-50 to-white border-2 border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-shadow"
                     >
                       <img
                         src={item.product.image || "/placeholder.svg"}
                         alt={item.product.name}
-                        className="w-16 h-16 object-contain"
+                        className="w-16 h-16 object-contain bg-white rounded-lg p-2 border border-slate-200"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement
-                          // Prevent infinite loop by checking if we've already tried the placeholder
                           if (!target.dataset.fallbackAttempted && !target.src.includes('placeholder.svg') && !target.src.includes('data:image')) {
                             target.dataset.fallbackAttempted = 'true'
                             target.src = '/placeholder.svg'
                           } else if (!target.src.includes('data:image')) {
-                            // If placeholder also fails, use a data URI as last resort
                             target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2U1ZTdlYiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTYiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='
                           }
                         }}
                       />
                       <div className="flex-1">
-                        <p className="font-semibold text-neutral-800">{item.product.name}</p>
-                        <p className="text-sm text-neutral-500">€{item.product.price.toFixed(2)} each</p>
+                        <p className="font-bold text-slate-800">{item.product.name}</p>
+                        <p className="text-sm text-slate-500">€{item.product.price.toFixed(2)} cada</p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-8 w-8 bg-transparent"
+                          className="h-8 w-8 bg-white hover:bg-slate-200 border-slate-300"
                           onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
                         >
                           -
                         </Button>
-                        <span className="w-8 text-center font-semibold">{item.quantity}</span>
+                        <span className="w-8 text-center font-bold text-slate-800">{item.quantity}</span>
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-8 w-8 bg-transparent"
+                          className="h-8 w-8 bg-white hover:bg-slate-200 border-slate-300"
                           onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
                         >
                           +
@@ -689,7 +743,7 @@ function VendingMachineContent() {
                         variant="ghost"
                         size="icon"
                         onClick={() => removeFromCart(item.product.id)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
                       >
                         <Trash2 className="w-5 h-5" />
                       </Button>
@@ -697,18 +751,18 @@ function VendingMachineContent() {
                   ))}
                 </div>
 
-                <div className="border-t-2 border-neutral-200 pt-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-lg font-semibold text-neutral-800">Total:</span>
-                    <span className="text-2xl font-bold text-cyan-500">€{getCartTotal().toFixed(2)}</span>
+                <div className="border-t-2 border-slate-200 pt-6 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-semibold text-slate-700">Total:</span>
+                    <span className="text-3xl font-bold bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">€{getCartTotal().toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between items-center mb-4 text-sm">
-                    <span className="text-neutral-600">Your Balance:</span>
-                    <span className="font-semibold text-neutral-800">€{currentUser?.balance.toFixed(2) || "0.00"}</span>
+                  <div className="flex justify-between items-center p-3 bg-cyan-50 rounded-xl border border-cyan-200">
+                    <span className="text-sm text-slate-600 font-medium">Saldo Disponível:</span>
+                    <span className="font-bold text-slate-800">€{currentUser?.balance.toFixed(2) || "0.00"}</span>
                   </div>
                   <Button
                     onClick={handleCheckout}
-                    className="w-full bg-cyan-500 hover:bg-cyan-600 text-white text-lg py-6"
+                    className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white text-lg py-6 rounded-xl shadow-lg font-semibold transition-all"
                     disabled={!currentUser}
                   >
                     {!currentUser ? "Login Necessário" : "Finalizar Compra"}
@@ -722,68 +776,75 @@ function VendingMachineContent() {
 
       {isCheckoutPageOpen && (
         <>
-          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setIsCheckoutPageOpen(false)} />
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-in fade-in duration-200" onClick={() => setIsCheckoutPageOpen(false)} />
 
-          <Card className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-4 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md sm:w-[500px] z-50">
+          <Card className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-white to-slate-50 p-6 sm:p-10 rounded-3xl shadow-2xl w-full max-w-md sm:w-[500px] z-50 border-0 animate-in zoom-in-95 duration-300">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setIsCheckoutPageOpen(false)}
-              className="absolute top-4 right-4 text-neutral-500 hover:text-neutral-700"
+              className="absolute top-4 right-4 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-all"
             >
               <X className="w-5 h-5" />
             </Button>
 
-            <h2 className="text-cyan-500 text-3xl font-bold text-center mb-8">Finalizar Compra</h2>
+            <h2 className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-blue-600 text-3xl sm:text-4xl font-bold text-center mb-2">Finalizar Compra</h2>
+            <p className="text-slate-500 text-sm text-center mb-8">Confirme os detalhes do seu pedido</p>
 
-            <div className="mb-6 p-4 bg-neutral-50 rounded-xl">
-              <h3 className="font-semibold text-neutral-800 mb-3">Resumo do Pedido</h3>
-              <div className="space-y-2">
+            <div className="mb-6 p-5 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 shadow-sm">
+              <h3 className="font-bold text-slate-800 mb-4 text-lg">Resumo do Pedido</h3>
+              <div className="space-y-3">
                 {cart.map((item) => (
-                  <div key={item.product.id} className="flex justify-between text-sm">
-                    <span className="text-neutral-600">
+                  <div key={item.product.id} className="flex justify-between items-center text-sm p-2 bg-white rounded-lg">
+                    <span className="text-slate-600 font-medium">
                       {item.product.name} x{item.quantity}
                     </span>
-                    <span className="font-medium text-neutral-800">
+                    <span className="font-bold text-slate-800">
                       €{(item.product.price * item.quantity).toFixed(2)}
                     </span>
                   </div>
                 ))}
               </div>
-              <div className="border-t border-neutral-200 mt-3 pt-3 flex justify-between">
-                <span className="font-semibold text-neutral-800">Total:</span>
-                <span className="text-xl font-bold text-cyan-500">€{getCartTotal().toFixed(2)}</span>
+              <div className="border-t-2 border-slate-200 mt-4 pt-4 flex justify-between items-center">
+                <span className="font-bold text-slate-800 text-lg">Total:</span>
+                <span className="text-2xl font-bold bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">€{getCartTotal().toFixed(2)}</span>
               </div>
             </div>
 
-            <div className="mb-8">
-              <div className="flex items-center space-x-3 p-4 border-2 border-neutral-200 rounded-xl hover:border-cyan-400 transition-colors">
+            <div className="mb-6">
+              <div className={`flex items-center space-x-3 p-4 border-2 rounded-xl transition-all cursor-pointer ${
+                isCashPayment 
+                  ? 'border-cyan-500 bg-cyan-50 shadow-md' 
+                  : 'border-slate-200 hover:border-cyan-300 bg-white'
+              }`}
+              onClick={() => setIsCashPayment(!isCashPayment)}
+              >
                 <Checkbox
                   id="cashPayment"
                   checked={isCashPayment}
                   onCheckedChange={(checked) => setIsCashPayment(checked as boolean)}
                   className="data-[state=checked]:bg-cyan-500 data-[state=checked]:border-cyan-500"
                 />
-                <label htmlFor="cashPayment" className="text-neutral-800 font-medium cursor-pointer flex-1">
+                <label htmlFor="cashPayment" className="text-slate-800 font-semibold cursor-pointer flex-1">
                   Pagamento em dinheiro
                 </label>
               </div>
-              <p className="text-xs text-neutral-500 mt-2 ml-11">
+              <p className="text-xs text-slate-500 mt-2 ml-11">
                 Se selecionar pagamento em dinheiro, o saldo não será cobrado
               </p>
             </div>
 
             {!isCashPayment && (
-              <div className="flex justify-between items-center mb-6 text-sm p-4 bg-cyan-50 rounded-xl">
-                <span className="text-neutral-600">Saldo Disponível:</span>
-                <span className="font-semibold text-neutral-800">€{currentUser?.balance.toFixed(2) || "0.00"}</span>
+              <div className="flex justify-between items-center mb-6 text-sm p-4 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-xl border border-cyan-200 shadow-sm">
+                <span className="text-slate-600 font-medium">Saldo Disponível:</span>
+                <span className="font-bold text-slate-800 text-lg">€{currentUser?.balance.toFixed(2) || "0.00"}</span>
               </div>
             )}
 
             <div className="space-y-4">
               <Button
                 onClick={completePurchase}
-                className="w-full bg-cyan-500 hover:bg-cyan-600 text-white text-lg py-6"
+                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white text-lg py-6 rounded-xl shadow-lg font-semibold transition-all"
                 disabled={!currentUser}
               >
                 {!currentUser ? "Login Necessário" : "Confirmar Compra"}
