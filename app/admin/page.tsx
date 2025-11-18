@@ -47,6 +47,7 @@ function AdminPageContent() {
   const [initialCupValue, setInitialCupValue] = useState<string>("")
   const [totalDeposits, setTotalDeposits] = useState<number>(0)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [editingProductOriginalStock, setEditingProductOriginalStock] = useState<number>(0)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [editingUserOriginalBalance, setEditingUserOriginalBalance] = useState<number>(0)
   const [selectedUserForDetails, setSelectedUserForDetails] = useState<string | null>(null)
@@ -221,6 +222,7 @@ function AdminPageContent() {
 
   const handleEditProduct = (product: Product) => {
     setEditingProduct({ ...product })
+    setEditingProductOriginalStock(product.stock)
     setIsAddingProduct(false)
   }
 
@@ -229,7 +231,8 @@ function AdminPageContent() {
     if (!editingProduct.name || 
         editingProduct.purchasePrice < 0 || 
         editingProduct.sellingPriceMember < 0 || 
-        editingProduct.sellingPriceNonMember < 0) {
+        editingProduct.sellingPriceNonMember < 0 ||
+        editingProduct.stock < 0) {
       await showAlert({
         message: "Por favor, preencha todos os campos corretamente",
         type: 'warning'
@@ -238,6 +241,7 @@ function AdminPageContent() {
     }
 
     try {
+      // Update product details
       await updateProduct(editingProduct.id, {
         name: editingProduct.name,
         purchasePrice: editingProduct.purchasePrice,
@@ -245,7 +249,15 @@ function AdminPageContent() {
         sellingPriceNonMember: editingProduct.sellingPriceNonMember,
         image: editingProduct.image || "",
       })
+
+      // Update stock if it changed
+      const stockDifference = editingProduct.stock - editingProductOriginalStock
+      if (stockDifference !== 0) {
+        await addProductStock(editingProduct.id, stockDifference, 'correction')
+      }
+
       setEditingProduct(null)
+      setEditingProductOriginalStock(0)
       loadData()
     } catch (error) {
       console.error('Error saving product:', error)
@@ -312,6 +324,7 @@ function AdminPageContent() {
 
   const handleCancelEdit = () => {
     setEditingProduct(null)
+    setEditingProductOriginalStock(0)
     setIsAddingProduct(false)
     setNewProduct({ name: "", purchasePrice: "", sellingPriceMember: "", sellingPriceNonMember: "", stock: "", image: "" })
   }
@@ -569,25 +582,38 @@ function AdminPageContent() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 sm:mb-8 gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">Admin Backoffice</h1>
-            <p className="text-slate-400 text-sm sm:text-base">SNecc-Bar Management System</p>
-          </div>
-          <div className="flex items-center gap-4 w-full sm:w-auto">
-            <div className="text-right flex-1 sm:flex-none">
+        <div className="flex flex-col gap-4 mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">Admin Backoffice</h1>
+              <p className="text-slate-400 text-sm sm:text-base">SNecc-Bar Management System</p>
+            </div>
+            <div className="hidden sm:block text-right">
               <p className="text-sm text-slate-400">Logged in as</p>
               <p className="text-white font-medium">{currentUser.name}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
+            <div className="text-right flex-1 sm:hidden">
+              <p className="text-xs text-slate-400">Logged in as</p>
+              <p className="text-white font-medium text-sm truncate">{currentUser.name}</p>
             </div>
             <Button 
               onClick={() => router.push("/")} 
               variant="outline" 
-              className="gap-2 bg-slate-700 hover:bg-slate-600 text-white border-slate-600 text-sm"
+              size="sm"
+              className="gap-1.5 sm:gap-2 bg-slate-700 hover:bg-slate-600 text-white border-slate-600 text-xs sm:text-sm flex-shrink-0"
             >
               <Home className="w-4 h-4" />
-              Página Principal
+              <span className="hidden sm:inline">Página Principal</span>
+              <span className="sm:hidden">Principal</span>
             </Button>
-            <Button onClick={handleLogout} variant="outline" className="gap-2 bg-transparent border-slate-600 text-white hover:bg-slate-700 text-sm">
+            <Button 
+              onClick={handleLogout} 
+              variant="outline" 
+              size="sm"
+              className="gap-1.5 sm:gap-2 bg-transparent border-slate-600 text-white hover:bg-slate-700 text-xs sm:text-sm flex-shrink-0"
+            >
               <LogOut className="w-4 h-4" />
               Logout
             </Button>
@@ -640,13 +666,15 @@ function AdminPageContent() {
 
         {/* Tabs */}
         <Tabs defaultValue="users" className="space-y-4 sm:space-y-6">
-          <TabsList className="bg-slate-800 border-slate-700 grid grid-cols-2 sm:grid-cols-5 w-full">
-            <TabsTrigger value="users" className="text-xs sm:text-sm">Users</TabsTrigger>
-            <TabsTrigger value="transactions" className="text-xs sm:text-sm">Transactions</TabsTrigger>
-            <TabsTrigger value="balance" className="text-xs sm:text-sm">Balance</TabsTrigger>
-            <TabsTrigger value="stock" className="text-xs sm:text-sm">Stock</TabsTrigger>
-            <TabsTrigger value="Necc" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto hide-scrollbar">
+            <TabsList className="bg-slate-800 border-slate-700 inline-flex w-full sm:grid sm:grid-cols-5 min-w-max sm:min-w-0">
+              <TabsTrigger value="users" className="text-xs sm:text-sm whitespace-nowrap flex-shrink-0">Users</TabsTrigger>
+              <TabsTrigger value="transactions" className="text-xs sm:text-sm whitespace-nowrap flex-shrink-0">Transactions</TabsTrigger>
+              <TabsTrigger value="balance" className="text-xs sm:text-sm whitespace-nowrap flex-shrink-0">Balance</TabsTrigger>
+              <TabsTrigger value="stock" className="text-xs sm:text-sm whitespace-nowrap flex-shrink-0">Stock</TabsTrigger>
+              <TabsTrigger value="Necc" className="text-xs sm:text-sm whitespace-nowrap flex-shrink-0">Financeiro</TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Users Tab */}
           <TabsContent value="users">
@@ -1413,9 +1441,13 @@ function AdminPageContent() {
                         onChange={(e) => setEditingProduct({ ...editingProduct, sellingPriceNonMember: Number.parseFloat(e.target.value) || 0 })}
                         className="bg-slate-600 text-white border-slate-500"
                       />
-                      <div className="text-sm text-slate-400">
-                        Stock atual: {editingProduct.stock} (use a seção de stock para alterar)
-                      </div>
+                      <Input
+                        type="number"
+                        placeholder="Stock"
+                        value={editingProduct.stock}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, stock: Number.parseInt(e.target.value) || 0 })}
+                        className="bg-slate-600 text-white border-slate-500"
+                      />
                       <Input
                         placeholder="URL da imagem"
                         value={editingProduct.image || ""}
