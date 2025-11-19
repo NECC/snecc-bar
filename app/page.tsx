@@ -306,7 +306,7 @@ function VendingMachineContent() {
       
       if (paymentMethod === 'balance') {
         await showAlert({
-          message: `Compra realizada com sucesso! ${cart.length} item(s) dispensado(s). Saldo restante: €${updatedUser?.balance.toFixed(2) || '0.00'}`,
+          message: `Compra realizada com sucesso! ${cart.length} item(s) dispensado(s). Saldo restante: א${updatedUser?.balance.toFixed(2) || '0.00'}`,
           type: 'success'
         })
       } else {
@@ -341,7 +341,7 @@ function VendingMachineContent() {
                 <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
                   sNECC-Bar
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 hidden sm:block">Máquina de venda automática</p>
+                <p className="text-xs sm:text-sm text-slate-500 hidden sm:block">Sistema de gestão de stock do bar do NECC</p>
               </div>
             </div>
             
@@ -445,7 +445,7 @@ function VendingMachineContent() {
                         </h3>
                         <div className="flex items-center justify-between">
                           <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
-                            €{product.price.toFixed(2)}
+                            א{product.price.toFixed(2)}
                           </span>
                           {product.stock > 0 && (
                             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -481,9 +481,9 @@ function VendingMachineContent() {
 
       {isPopupOpen && (
         <>
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-in fade-in duration-200" onClick={() => setIsPopupOpen(false)} />
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-in fade-in duration-200 " onClick={() => setIsPopupOpen(false)} />
 
-          <Card className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-white to-slate-50 p-6 sm:p-10 rounded-3xl shadow-2xl w-full max-w-md z-50 border-0 animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
+          <Card className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-white to-slate-50 p-6 sm:p-10 rounded-3xl shadow-2xl w-full max-w-md z-50 border-0 animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto hide-scrollbar">
             <Button
               variant="ghost"
               size="icon"
@@ -493,8 +493,8 @@ function VendingMachineContent() {
               <X className="w-5 h-5" />
             </Button>
 
-            <h2 className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-blue-600 text-3xl sm:text-4xl font-bold text-center mb-2">Área do aluno</h2>
-            <p className="text-slate-500 text-sm text-center mb-8">Gerencie a sua conta e histórico</p>
+            <h2 className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-blue-600 text-3xl sm:text-4xl font-bold text-center mb-2">{currentUser !== null ? "Detalhes da conta" : "Login / Registo"}</h2>
+            <p className="text-slate-500 text-sm text-center mb-8">Detalhes da conta e histórico</p>
 
             <div className="flex items-center gap-4 mb-6 p-4 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-2xl border border-cyan-100">
               <div className="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full p-4 shadow-lg">
@@ -506,7 +506,7 @@ function VendingMachineContent() {
                   <p className="text-slate-600 text-sm">{currentUser.email}</p>
                 )}
                 <p className="text-cyan-600 font-bold mt-2 text-lg">
-                  €{currentUser?.balance !== undefined ? currentUser.balance.toFixed(2) : "0.00"}
+                  א{currentUser?.balance !== undefined ? currentUser.balance.toFixed(2) : "0.00"}
                 </p>
                 {currentUser && (
                   <div className="mt-3 flex items-center gap-2 flex-wrap">
@@ -529,17 +529,17 @@ function VendingMachineContent() {
                 <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl p-4 text-center border border-cyan-200 shadow-sm">
                   <p className="text-xs text-slate-600 mb-2 font-medium">Total Gasto</p>
                   <p className="text-xl font-bold text-cyan-600">
-                    €{userOrders.reduce((sum, o) => sum + o.total, 0).toFixed(2)}
+                    א{userOrders.reduce((sum, o) => sum + o.total, 0).toFixed(2)}
                   </p>
                 </div>
                 <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl p-4 text-center border border-cyan-200 shadow-sm">
-                  <p className="text-xs text-slate-600 mb-2 font-medium">Encomendas</p>
+                  <p className="text-xs text-slate-600 mb-2 font-medium">Nº de compras</p>
                   <p className="text-xl font-bold text-cyan-600">{userOrders.length}</p>
                 </div>
                 <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 text-center border border-green-200 shadow-sm">
                   <p className="text-xs text-slate-600 mb-2 font-medium">Total Depositado</p>
                   <p className="text-xl font-bold text-green-600">
-                    €{userDeposits.reduce((sum, d) => sum + d.amount, 0).toFixed(2)}
+                    א{userDeposits.reduce((sum, d) => sum + d.amount, 0).toFixed(2)}
                   </p>
                 </div>
                 <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 text-center border border-green-200 shadow-sm">
@@ -555,7 +555,7 @@ function VendingMachineContent() {
                   <TabsList className="grid w-full grid-cols-2 bg-slate-100 rounded-xl p-1">
                     <TabsTrigger value="orders" className="text-xs sm:text-sm text-slate-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-600 data-[state=active]:text-white rounded-lg transition-all">
                       <History className="w-3 h-3 mr-1" />
-                      Encomendas ({userOrders.length})
+                      Compras ({userOrders.length})
                     </TabsTrigger>
                     <TabsTrigger value="deposits" className="text-xs sm:text-sm text-slate-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-600 data-[state=active]:text-white rounded-lg transition-all">
                       <TrendingUp className="w-3 h-3 mr-1" />
@@ -566,7 +566,7 @@ function VendingMachineContent() {
                   <TabsContent value="orders" className="mt-3">
                     <div className="max-h-64 overflow-y-auto space-y-2 hide-scrollbar">
                       {userOrders.length === 0 ? (
-                        <p className="text-sm text-slate-500 text-center py-8 bg-slate-50 rounded-xl">Nenhuma encomenda ainda</p>
+                        <p className="text-sm text-slate-500 text-center py-8 bg-slate-50 rounded-xl">Nenhuma compra efetuada</p>
                       ) : (
                         userOrders.slice(0, 10).map((order) => (
                           <div key={order.id} className="bg-gradient-to-r from-slate-50 to-white rounded-xl p-3 text-xs border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
@@ -579,7 +579,7 @@ function VendingMachineContent() {
                                   minute: '2-digit'
                                 })}
                               </span>
-                              <span className="font-bold text-cyan-600 text-sm">€{order.total.toFixed(2)}</span>
+                              <span className="font-bold text-cyan-600 text-sm">א{order.total.toFixed(2)}</span>
                             </div>
                             <div className="text-slate-500 truncate mb-1">
                               {order.items.map((item, idx) => (
@@ -620,7 +620,7 @@ function VendingMachineContent() {
                                 })}
                               </span>
                               <span className={`font-bold text-sm ${deposit.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {deposit.amount >= 0 ? '+' : ''}€{deposit.amount.toFixed(2)}
+                                {deposit.amount >= 0 ? '+' : ''}א{deposit.amount.toFixed(2)}
                               </span>
                             </div>
                             <div className="text-slate-400 text-xs">
@@ -631,7 +631,7 @@ function VendingMachineContent() {
                       )}
                       {userDeposits.length > 10 && (
                         <p className="text-xs text-slate-400 text-center pt-2">
-                          Mostrando últimos 10 de {userDeposits.length}
+                          Últimos 10 depósitos de {userDeposits.length}
                         </p>
                       )}
                     </div>
@@ -686,7 +686,7 @@ function VendingMachineContent() {
             </Button>
 
             <h2 className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-blue-600 text-3xl sm:text-4xl font-bold text-center mb-2">Checkout</h2>
-            <p className="text-slate-500 text-sm text-center mb-8">Revise os seus produtos</p>
+            <p className="text-slate-500 text-sm text-center mb-8">Verifique os seus produtos</p>
 
             {cart.length === 0 ? (
               <div className="text-center py-16">
@@ -718,7 +718,7 @@ function VendingMachineContent() {
                       />
                       <div className="flex-1">
                         <p className="font-bold text-slate-800">{item.product.name}</p>
-                        <p className="text-sm text-slate-500">€{item.product.price.toFixed(2)} cada</p>
+                        <p className="text-sm text-slate-500">א{item.product.price.toFixed(2)} cada</p>
                       </div>
                       <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
                         <Button
@@ -754,11 +754,11 @@ function VendingMachineContent() {
                 <div className="border-t-2 border-slate-200 pt-6 space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-lg font-semibold text-slate-700">Total:</span>
-                    <span className="text-3xl font-bold bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">€{getCartTotal().toFixed(2)}</span>
+                    <span className="text-3xl font-bold bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">א{getCartTotal().toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-cyan-50 rounded-xl border border-cyan-200">
                     <span className="text-sm text-slate-600 font-medium">Saldo Disponível:</span>
-                    <span className="font-bold text-slate-800">€{currentUser?.balance.toFixed(2) || "0.00"}</span>
+                    <span className="font-bold text-slate-800">א{currentUser?.balance.toFixed(2) || "0.00"}</span>
                   </div>
                   <Button
                     onClick={handleCheckout}
@@ -800,14 +800,14 @@ function VendingMachineContent() {
                       {item.product.name} x{item.quantity}
                     </span>
                     <span className="font-bold text-slate-800">
-                      €{(item.product.price * item.quantity).toFixed(2)}
+                      א{(item.product.price * item.quantity).toFixed(2)}
                     </span>
                   </div>
                 ))}
               </div>
               <div className="border-t-2 border-slate-200 mt-4 pt-4 flex justify-between items-center">
                 <span className="font-bold text-slate-800 text-lg">Total:</span>
-                <span className="text-2xl font-bold bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">€{getCartTotal().toFixed(2)}</span>
+                <span className="text-2xl font-bold bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">א{getCartTotal().toFixed(2)}</span>
               </div>
             </div>
 
@@ -837,7 +837,7 @@ function VendingMachineContent() {
             {!isCashPayment && (
               <div className="flex justify-between items-center mb-6 text-sm p-4 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-xl border border-cyan-200 shadow-sm">
                 <span className="text-slate-600 font-medium">Saldo Disponível:</span>
-                <span className="font-bold text-slate-800 text-lg">€{currentUser?.balance.toFixed(2) || "0.00"}</span>
+                <span className="font-bold text-slate-800 text-lg">א{currentUser?.balance.toFixed(2) || "0.00"}</span>
               </div>
             )}
 
