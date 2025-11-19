@@ -62,6 +62,7 @@ function VendingMachineContent() {
   const [userOrders, setUserOrders] = useState<Order[]>([])
   const [userDeposits, setUserDeposits] = useState<Deposit[]>([])
   const [clickingProducts, setClickingProducts] = useState<Set<string>>(new Set())
+  const [isProcessingPurchase, setIsProcessingPurchase] = useState(false)
   const cartButtonRef = useRef<HTMLButtonElement>(null)
   const router = useRouter()
 
@@ -258,6 +259,21 @@ function VendingMachineContent() {
       return
     }
 
+    // Prevenir múltiplos cliques
+    if (isProcessingPurchase) {
+      return
+    }
+
+    if (cart.length === 0) {
+      await showAlert({
+        message: "O carrinho está vazio",
+        type: 'warning'
+      })
+      return
+    }
+
+    setIsProcessingPurchase(true)
+
     try {
       // Prepare order items - server will determine prices based on user's member status
       const orderItems = cart.map((item) => ({
@@ -322,6 +338,8 @@ function VendingMachineContent() {
         message: errorMessage,
         type: 'error'
       })
+    } finally {
+      setIsProcessingPurchase(false)
     }
   }
 
@@ -844,10 +862,14 @@ function VendingMachineContent() {
             <div className="space-y-4">
               <Button
                 onClick={completePurchase}
-                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white text-lg py-6 rounded-xl shadow-lg font-semibold transition-all"
-                disabled={!currentUser}
+                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white text-lg py-6 rounded-xl shadow-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!currentUser || isProcessingPurchase || cart.length === 0}
               >
-                {!currentUser ? "Login Necessário" : "Confirmar Compra"}
+                {!currentUser 
+                  ? "Login Necessário" 
+                  : isProcessingPurchase 
+                    ? "Processando..." 
+                    : "Confirmar Compra"}
               </Button>
             </div>
           </Card>

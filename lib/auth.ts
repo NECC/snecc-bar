@@ -373,13 +373,15 @@ export async function addOrder(
       }
     }
 
-    // Create order
+    // Create order with payment_processed = false
+    // Stock will only be deducted after payment is confirmed
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
         user_id: userId,
         total,
         payment_method: paymentMethod,
+        payment_processed: false,
       })
       .select()
       .single()
@@ -389,10 +391,11 @@ export async function addOrder(
       throw new Error('Erro ao criar encomenda')
     }
 
-    // Create order items and inventory movements
+    // Create order items
+    // Note: inventory_movements will be created automatically by trigger
+    // ONLY after payment_processed is set to true (security measure)
     for (const item of orderItemsWithPrices) {
-      // Create order item
-      const { data: orderItem, error: itemError } = await supabase
+      const { error: itemError } = await supabase
         .from('order_items')
         .insert({
           order_id: order.id,
@@ -401,42 +404,40 @@ export async function addOrder(
           price_per_unit: item.pricePerUnit,
           subtotal: item.subtotal,
         })
-        .select()
-        .single()
 
       if (itemError) {
         console.error('Error creating order item:', itemError)
         throw new Error('Erro ao criar item da encomenda')
       }
-
-      // Create inventory movement (sale) - trigger will update stock automatically
-      const { error: invError } = await supabase
-        .from('inventory_movements')
-        .insert({
-          product_id: item.productId,
-          type: 'sale',
-          quantity: item.quantity,
-          order_item_id: orderItem.id,
-        })
-
-      if (invError) {
-        console.error('Error creating inventory movement:', invError)
-        // Don't throw, as order is already created
-      }
     }
 
-    // If payment is by balance, deduct from user balance
+    // Process payment BEFORE marking as processed
+    // This ensures payment is completed before stock is deducted
     if (paymentMethod === 'balance') {
       const newBalance = userBalance - total
       await updateUserBalance(userId, newBalance)
     }
 
-    // If payment is by cash, add to available cash
     if (paymentMethod === 'cash') {
       const currentAvailableCash = await getAvailableCash()
       const newAvailableCash = currentAvailableCash + total
       await updateAvailableCash(newAvailableCash)
     }
+
+    // Processar pagamento no servidor usando função stored procedure
+    // Esta função atualiza payment_processed E cria inventory_movements numa transação atómica
+    // É mais seguro porque tudo acontece no servidor, não no cliente
+    const { error: processError } = await supabase.rpc('process_order_payment', {
+      p_order_id: order.id,
+      p_user_id: userId
+    })
+
+    if (processError) {
+      console.error('Error processing payment:', processError)
+      throw new Error(`Erro ao processar pagamento: ${processError.message || 'Erro desconhecido'}`)
+    }
+
+    console.log('✅ Pagamento processado e inventory movements criados com sucesso')
 
     return order
   } catch (error: any) {
