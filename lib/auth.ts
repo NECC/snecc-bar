@@ -196,9 +196,12 @@ export async function getUsers(): Promise<User[]> {
 }
 
 export async function updateUserBalance(userId: string, newBalance: number) {
+  // Arredondar para 2 casas decimais antes de salvar
+  const roundedBalance = Math.round(newBalance * 100) / 100
+  
   const { error } = await supabase
     .from('users')
-    .update({ balance: newBalance })
+    .update({ balance: roundedBalance })
     .eq('id', userId)
 
   if (error) {
@@ -355,16 +358,20 @@ export async function addOrder(
         ? parseFloat(product.selling_price_member) 
         : parseFloat(product.selling_price_non_member)
       
-      const subtotal = pricePerUnit * item.quantity
-      total += subtotal
+      // Arredondar para 2 casas decimais para evitar problemas de precisão
+      const subtotal = Math.round((pricePerUnit * item.quantity) * 100) / 100
+      total = Math.round((total + subtotal) * 100) / 100
 
       orderItemsWithPrices.push({
         productId: item.productId,
         quantity: item.quantity,
-        pricePerUnit,
-        subtotal,
+        pricePerUnit: Math.round(pricePerUnit * 100) / 100,
+        subtotal: Math.round(subtotal * 100) / 100,
       })
     }
+
+    // Arredondar total final para garantir precisão
+    total = Math.round(total * 100) / 100
 
     // If payment is by balance, verify user has enough balance
     if (paymentMethod === 'balance') {
@@ -414,13 +421,13 @@ export async function addOrder(
     // Process payment BEFORE marking as processed
     // This ensures payment is completed before stock is deducted
     if (paymentMethod === 'balance') {
-      const newBalance = userBalance - total
+      const newBalance = Math.round((userBalance - total) * 100) / 100
       await updateUserBalance(userId, newBalance)
     }
 
     if (paymentMethod === 'cash') {
       const currentAvailableCash = await getAvailableCash()
-      const newAvailableCash = currentAvailableCash + total
+      const newAvailableCash = Math.round((currentAvailableCash + total) * 100) / 100
       await updateAvailableCash(newAvailableCash)
     }
 
@@ -624,14 +631,14 @@ export async function addDeposit(userId: string, amount: number, method: 'cash' 
       .single()
 
     if (userData) {
-      const newBalance = parseFloat(userData.balance) + amount
+      const newBalance = Math.round((parseFloat(userData.balance) + amount) * 100) / 100
       await updateUserBalance(userId, newBalance)
     }
 
     // Update available cash if it's a real deposit (cash or mbway), not an adjustment
     if (method !== 'adjustment') {
       const currentAvailableCash = await getAvailableCash()
-      const newAvailableCash = currentAvailableCash + amount
+      const newAvailableCash = Math.round((currentAvailableCash + amount) * 100) / 100
       await updateAvailableCash(newAvailableCash)
     }
   } catch (error) {
@@ -682,7 +689,7 @@ export async function deleteOrder(orderId: string): Promise<void> {
 
       if (userData) {
         const currentBalance = parseFloat(userData.balance) || 0
-        const newBalance = currentBalance + parseFloat(order.total)
+        const newBalance = Math.round((currentBalance + parseFloat(order.total)) * 100) / 100
         await updateUserBalance(order.user_id, newBalance)
       }
     }
@@ -691,7 +698,7 @@ export async function deleteOrder(orderId: string): Promise<void> {
     if (order.payment_method === 'cash') {
       const currentAvailableCash = await getAvailableCash()
       const orderTotal = parseFloat(order.total)
-      const newAvailableCash = currentAvailableCash - orderTotal
+      const newAvailableCash = Math.round((currentAvailableCash - orderTotal) * 100) / 100
       
       // Check if available cash would go negative
       if (newAvailableCash < 0) {
@@ -790,7 +797,7 @@ export async function deleteDeposit(depositId: string): Promise<void> {
 
     if (userData) {
       const currentBalance = parseFloat(userData.balance) || 0
-      const newBalance = currentBalance - amount
+      const newBalance = Math.round((currentBalance - amount) * 100) / 100
       
       // Check if balance would go negative
       if (newBalance < 0) {
@@ -803,7 +810,7 @@ export async function deleteDeposit(depositId: string): Promise<void> {
     // If it was a real deposit (cash or mbway), subtract from available cash
     if (deposit.method !== 'adjustment') {
       const currentAvailableCash = await getAvailableCash()
-      const newAvailableCash = currentAvailableCash - amount
+      const newAvailableCash = Math.round((currentAvailableCash - amount) * 100) / 100
       
       // Check if available cash would go negative
       if (newAvailableCash < 0) {
@@ -887,10 +894,12 @@ export async function getAvailableCash(): Promise<number> {
 }
 
 export async function updateAvailableCash(amount: number): Promise<void> {
+  // Arredondar para 2 casas decimais antes de salvar
+  const roundedAmount = Math.round(amount * 100) / 100
   try {
     const { error } = await supabase
       .from('available_cash')
-      .update({ amount })
+      .update({ amount: roundedAmount })
       .eq('id', '00000000-0000-0000-0000-000000000000')
 
     if (error) {

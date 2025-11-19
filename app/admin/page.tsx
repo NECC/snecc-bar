@@ -330,27 +330,30 @@ function AdminPageContent() {
   }
 
 
-  const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0)
+  // Função helper para arredondar valores monetários
+  const roundMoney = (value: number) => Math.round(value * 100) / 100
+
+  const totalRevenue = roundMoney(orders.reduce((sum, o) => sum + o.total, 0))
   const totalOrders = orders.length
-  const revenueFromBalance = orders.filter(o => o.paymentMethod === 'balance').reduce((sum, o) => sum + o.total, 0)
-  const revenueFromCash = orders.filter(o => o.paymentMethod === 'cash').reduce((sum, o) => sum + o.total, 0)
+  const revenueFromBalance = roundMoney(orders.filter(o => o.paymentMethod === 'balance').reduce((sum, o) => sum + o.total, 0))
+  const revenueFromCash = roundMoney(orders.filter(o => o.paymentMethod === 'cash').reduce((sum, o) => sum + o.total, 0))
   const totalUsers = users.length
   const totalMembers = users.filter(u => u.isMember).length
   const totalProducts = products.length
-  const totalStockValue = products.reduce((sum, p) => sum + (p.purchasePrice * p.stock), 0)
-  const totalUserBalances = users.reduce((sum, u) => sum + u.balance, 0)
-  const totalPurchased = orders.reduce((sum, o) => sum + o.total, 0)
+  const totalStockValue = roundMoney(products.reduce((sum, p) => sum + (p.purchasePrice * p.stock), 0))
+  const totalUserBalances = roundMoney(users.reduce((sum, u) => sum + u.balance, 0))
+  const totalPurchased = roundMoney(orders.reduce((sum, o) => sum + o.total, 0))
   
   // Riqueza total = depósitos + compras em dinheiro (não conta duas vezes)
   // Se alguém carrega saldo e depois compra com saldo, não conta duas vezes
-  const totalWealth = totalDeposits + revenueFromCash
+  const totalWealth = roundMoney(totalDeposits + revenueFromCash)
   
   // Lucro esperado: se todos comprarem como sócios (preço sócio - preço compra) * stock
   const calculateExpectedProfit = () => {
-    return products.reduce((total, product) => {
+    return roundMoney(products.reduce((total, product) => {
       const profitPerUnit = product.sellingPriceMember - product.purchasePrice
       return total + (profitPerUnit * product.stock)
-    }, 0)
+    }, 0))
   }
   
   // Lucro real: lucro de vendas aos sócios - valor em stock
@@ -359,7 +362,7 @@ function AdminPageContent() {
     // Calcular receita de vendas aos sócios (apenas vendas pagas com saldo ou dinheiro, mas considerando preço sócio)
     // Na verdade, precisamos calcular o lucro real baseado nas vendas feitas
     // Lucro real = receita total - custo das mercadorias vendidas
-    const costOfGoodsSold = orders.reduce((total, order) => {
+    const costOfGoodsSold = roundMoney(orders.reduce((total, order) => {
       return total + order.items.reduce((orderTotal, item) => {
         const product = products.find(p => p.id === item.productId)
         if (product) {
@@ -367,8 +370,8 @@ function AdminPageContent() {
         }
         return orderTotal
       }, 0)
-    }, 0)
-    return totalRevenue - costOfGoodsSold
+    }, 0))
+    return roundMoney(totalRevenue - costOfGoodsSold)
   }
   
   const expectedProfit = calculateExpectedProfit()
@@ -452,8 +455,8 @@ function AdminPageContent() {
     const userOrders = orders.filter(o => o.userId === userId)
     const userDeposits = deposits.filter(d => d.userId === userId)
     return {
-      totalSpent: userOrders.reduce((sum, o) => sum + o.total, 0),
-      totalDeposited: userDeposits.reduce((sum, d) => sum + d.amount, 0),
+      totalSpent: roundMoney(userOrders.reduce((sum, o) => sum + o.total, 0)),
+      totalDeposited: roundMoney(userDeposits.reduce((sum, d) => sum + d.amount, 0)),
       orderCount: userOrders.length,
       depositCount: userDeposits.length,
     }

@@ -231,7 +231,9 @@ function VendingMachineContent() {
   }
 
   const getCartTotal = () => {
-    return cart.reduce((total, item) => total + item.product.price * item.quantity, 0)
+    const total = cart.reduce((total, item) => total + item.product.price * item.quantity, 0)
+    // Arredondar para 2 casas decimais para evitar problemas de precisão
+    return Math.round(total * 100) / 100
   }
 
   const handleCheckout = async () => {
