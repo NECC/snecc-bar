@@ -376,7 +376,7 @@ export async function addOrder(
     // If payment is by balance, verify user has enough balance
     if (paymentMethod === 'balance') {
       if (userBalance < total) {
-        throw new Error(`Saldo insuficiente! Total: €${total.toFixed(2)}, Saldo disponível: €${userBalance.toFixed(2)}`)
+        throw new Error(`Saldo insuficiente! Total: N${total.toFixed(2)}, Saldo disponível: N${userBalance.toFixed(2)}`)
       }
     }
 

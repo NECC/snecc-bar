@@ -173,7 +173,7 @@ function AdminPageContent() {
     // Check if removing money would result in negative balance
     if (amount < 0 && user.balance + amount < 0) {
       await showAlert({
-        message: `Não é possível remover €${Math.abs(amount).toFixed(2)}. Saldo atual: €${user.balance.toFixed(2)}`,
+        message: `Não é possível remover N${Math.abs(amount).toFixed(2)}. Saldo atual: N${user.balance.toFixed(2)}`,
         type: 'error'
       })
       return
@@ -415,7 +415,7 @@ function AdminPageContent() {
     const transactionType = transaction.type === 'order' ? 'encomenda' : 'depósito'
     const confirmMessage = `Tem certeza que deseja apagar esta ${transactionType}?\n\n` +
       `Usuário: ${transaction.userName}\n` +
-      `Valor: €${Math.abs(transaction.amount).toFixed(2)}\n` +
+      `Valor: N${Math.abs(transaction.amount).toFixed(2)}\n` +
       `Data: ${new Date(transaction.timestamp).toLocaleString('pt-PT')}\n\n` +
       `Esta ação irá reverter todas as alterações (saldo, stock, etc.) e não pode ser desfeita.`
     
@@ -642,7 +642,7 @@ function AdminPageContent() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-white">{totalOrders}</div>
-              <p className="text-xs text-slate-400 mt-1">€{totalRevenue.toFixed(2)} receita</p>
+              <p className="text-xs text-slate-400 mt-1">N{totalRevenue.toFixed(2)} receita</p>
             </CardContent>
           </Card>
           <Card className="bg-slate-800 border-slate-700">
@@ -651,8 +651,8 @@ function AdminPageContent() {
               <DollarSign className="w-4 h-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">€{totalRevenue.toFixed(2)}</div>
-              <p className="text-xs text-slate-400 mt-1">€{revenueFromBalance.toFixed(2)} saldo / €{revenueFromCash.toFixed(2)} dinheiro</p>
+              <div className="text-2xl font-bold text-white">N{totalRevenue.toFixed(2)}</div>
+              <p className="text-xs text-slate-400 mt-1">N{revenueFromBalance.toFixed(2)} saldo / N{revenueFromCash.toFixed(2)} dinheiro</p>
             </CardContent>
           </Card>
           <Card className="bg-slate-800 border-slate-700">
@@ -661,8 +661,8 @@ function AdminPageContent() {
               <TrendingUp className="w-4 h-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">€{actualProfit.toFixed(2)}</div>
-              <p className="text-xs text-slate-400 mt-1">€{expectedProfit.toFixed(2)} esperado</p>
+              <div className="text-2xl font-bold text-white">N{actualProfit.toFixed(2)}</div>
+              <p className="text-xs text-slate-400 mt-1">N{expectedProfit.toFixed(2)} esperado</p>
             </CardContent>
           </Card>
         </div>
@@ -720,7 +720,7 @@ function AdminPageContent() {
                             <tr key={user.id} className="border-b border-slate-700">
                               <td className="p-2">{user.name}</td>
                               <td className="p-2 text-sm">{user.email}</td>
-                              <td className="p-2">€{user.balance.toFixed(2)}</td>
+                              <td className="p-2">N{user.balance.toFixed(2)}</td>
                               <td className="p-2">
                                 <span className={`px-2 py-1 rounded text-xs ${
                                   user.role === 'admin' 
@@ -744,8 +744,8 @@ function AdminPageContent() {
                               </td>
                               <td className="p-2">
                                 <div className="text-xs">
-                                  <div>Gasto: €{stats.totalSpent.toFixed(2)}</div>
-                                  <div>Depositado: €{stats.totalDeposited.toFixed(2)}</div>
+                                  <div>Gasto: N{stats.totalSpent.toFixed(2)}</div>
+                                  <div>Depositado: N{stats.totalDeposited.toFixed(2)}</div>
                                   <div>{stats.orderCount} encomendas</div>
                                 </div>
                               </td>
@@ -798,11 +798,11 @@ function AdminPageContent() {
                             <div className="grid grid-cols-2 gap-4">
                               <div className="bg-slate-600 rounded-lg p-3">
                                 <p className="text-xs text-slate-400 mb-1">Total Gasto</p>
-                                <p className="text-lg font-bold text-white">€{stats.totalSpent.toFixed(2)}</p>
+                                <p className="text-lg font-bold text-white">N{stats.totalSpent.toFixed(2)}</p>
                               </div>
                               <div className="bg-slate-600 rounded-lg p-3">
                                 <p className="text-xs text-slate-400 mb-1">Total Depositado</p>
-                                <p className="text-lg font-bold text-green-400">€{stats.totalDeposited.toFixed(2)}</p>
+                                <p className="text-lg font-bold text-green-400">N{stats.totalDeposited.toFixed(2)}</p>
                               </div>
                               <div className="bg-slate-600 rounded-lg p-3">
                                 <p className="text-xs text-slate-400 mb-1">Número de Encomendas</p>
@@ -828,7 +828,7 @@ function AdminPageContent() {
                                           minute: '2-digit' 
                                         })}
                                       </span>
-                                      <span className="font-bold text-cyan-400">€{order.total.toFixed(2)}</span>
+                                      <span className="font-bold text-cyan-400">N{order.total.toFixed(2)}</span>
                                     </div>
                                     <div className="text-xs text-slate-400 mt-1">
                                       {order.items.map((item, idx) => (
@@ -864,7 +864,7 @@ function AdminPageContent() {
                                         })}
                                       </span>
                                       <span className={`font-bold ${deposit.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                        {deposit.amount >= 0 ? '+' : ''}€{deposit.amount.toFixed(2)}
+                                        {deposit.amount >= 0 ? '+' : ''}N{deposit.amount.toFixed(2)}
                                       </span>
                                     </div>
                                     <div className="text-xs text-slate-500 mt-1">
@@ -1130,7 +1130,7 @@ function AdminPageContent() {
                             <td className={`p-2 font-semibold ${
                               transaction.amount < 0 ? 'text-red-400' : 'text-green-400'
                             }`}>
-                              {transaction.amount < 0 ? '-' : '+'}€{Math.abs(transaction.amount).toFixed(2)}
+                              {transaction.amount < 0 ? '-' : '+'}N{Math.abs(transaction.amount).toFixed(2)}
                             </td>
                             <td className="p-2 text-sm text-slate-400">
                               {transaction.paymentMethod 
@@ -1176,13 +1176,13 @@ function AdminPageContent() {
                       <div>
                         <p className="text-xs text-slate-400 mb-1">Total de Depósitos</p>
                         <p className="text-lg font-bold text-green-400">
-                          €{filteredTransactions.filter(t => t.type === 'deposit').reduce((sum, t) => sum + t.amount, 0).toFixed(2)}
+                          N{filteredTransactions.filter(t => t.type === 'deposit').reduce((sum, t) => sum + t.amount, 0).toFixed(2)}
                         </p>
                       </div>
                       <div>
                         <p className="text-xs text-slate-400 mb-1">Total de Compras</p>
                         <p className="text-lg font-bold text-red-400">
-                          €{Math.abs(filteredTransactions.filter(t => t.type === 'order').reduce((sum, t) => sum + t.amount, 0)).toFixed(2)}
+                          N{Math.abs(filteredTransactions.filter(t => t.type === 'order').reduce((sum, t) => sum + t.amount, 0)).toFixed(2)}
                         </p>
                       </div>
                     </div>
@@ -1243,7 +1243,7 @@ function AdminPageContent() {
                           >
                             <div className="font-medium">{user.name}</div>
                             <div className="text-xs text-slate-400">{user.email}</div>
-                            <div className="text-xs text-slate-500">Saldo: €{user.balance.toFixed(2)}</div>
+                            <div className="text-xs text-slate-500">Saldo: N{user.balance.toFixed(2)}</div>
                           </button>
                         ))}
                       {users.filter((user) => {
@@ -1268,7 +1268,7 @@ function AdminPageContent() {
                       </span>
                     </p>
                     <p className="text-xs text-slate-400 mt-1">
-                      Saldo atual: €{users.find(u => u.id === selectedUserId)?.balance.toFixed(2) || '0.00'}
+                      Saldo atual: N{users.find(u => u.id === selectedUserId)?.balance.toFixed(2) || '0.00'}
                     </p>
                   </div>
                 )}
@@ -1363,7 +1363,7 @@ function AdminPageContent() {
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Preço de compra (€)"
+                        placeholder="Preço de compra (N)"
                         value={newProduct.purchasePrice}
                         onChange={(e) => setNewProduct({ ...newProduct, purchasePrice: e.target.value })}
                         className="bg-slate-600 text-white border-slate-500"
@@ -1371,7 +1371,7 @@ function AdminPageContent() {
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Preço de venda membro (€)"
+                        placeholder="Preço de venda membro (N)"
                         value={newProduct.sellingPriceMember}
                         onChange={(e) => setNewProduct({ ...newProduct, sellingPriceMember: e.target.value })}
                         className="bg-slate-600 text-white border-slate-500"
@@ -1379,7 +1379,7 @@ function AdminPageContent() {
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Preço de venda não-membro (€)"
+                        placeholder="Preço de venda não-membro (N)"
                         value={newProduct.sellingPriceNonMember}
                         onChange={(e) => setNewProduct({ ...newProduct, sellingPriceNonMember: e.target.value })}
                         className="bg-slate-600 text-white border-slate-500"
@@ -1423,7 +1423,7 @@ function AdminPageContent() {
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Preço de compra (€)"
+                        placeholder="Preço de compra (N)"
                         value={editingProduct.purchasePrice}
                         onChange={(e) => setEditingProduct({ ...editingProduct, purchasePrice: Number.parseFloat(e.target.value) || 0 })}
                         className="bg-slate-600 text-white border-slate-500"
@@ -1431,7 +1431,7 @@ function AdminPageContent() {
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Preço de venda membro (€)"
+                        placeholder="Preço de venda membro (N)"
                         value={editingProduct.sellingPriceMember}
                         onChange={(e) => setEditingProduct({ ...editingProduct, sellingPriceMember: Number.parseFloat(e.target.value) || 0 })}
                         className="bg-slate-600 text-white border-slate-500"
@@ -1439,7 +1439,7 @@ function AdminPageContent() {
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Preço de venda não-membro (€)"
+                        placeholder="Preço de venda não-membro (N)"
                         value={editingProduct.sellingPriceNonMember}
                         onChange={(e) => setEditingProduct({ ...editingProduct, sellingPriceNonMember: Number.parseFloat(e.target.value) || 0 })}
                         className="bg-slate-600 text-white border-slate-500"
@@ -1504,18 +1504,18 @@ function AdminPageContent() {
                           return (
                             <tr key={product.id} className="border-b border-slate-700">
                               <td className="p-2 font-medium">{product.name}</td>
-                              <td className="p-2">€{product.purchasePrice.toFixed(2)}</td>
-                              <td className="p-2">€{product.sellingPriceMember.toFixed(2)}</td>
-                              <td className="p-2">€{product.sellingPriceNonMember.toFixed(2)}</td>
+                              <td className="p-2">N{product.purchasePrice.toFixed(2)}</td>
+                              <td className="p-2">N{product.sellingPriceMember.toFixed(2)}</td>
+                              <td className="p-2">N{product.sellingPriceNonMember.toFixed(2)}</td>
                               <td className="p-2">
                                 <div className="text-sm">
-                                  <div className="text-green-400">€{memberMargin.toFixed(2)}</div>
+                                  <div className="text-green-400">N{memberMargin.toFixed(2)}</div>
                                   <div className="text-xs text-slate-400">{memberMarginPercent.toFixed(1)}%</div>
                                 </div>
                               </td>
                               <td className="p-2">
                                 <div className="text-sm">
-                                  <div className="text-green-400">€{nonMemberMargin.toFixed(2)}</div>
+                                  <div className="text-green-400">N{nonMemberMargin.toFixed(2)}</div>
                                   <div className="text-xs text-slate-400">{nonMemberMarginPercent.toFixed(1)}%</div>
                                 </div>
                               </td>
@@ -1524,7 +1524,7 @@ function AdminPageContent() {
                                   {product.stock}
                                 </span>
                               </td>
-                              <td className="p-2 text-sm text-slate-400">€{stockValue.toFixed(2)}</td>
+                              <td className="p-2 text-sm text-slate-400">N{stockValue.toFixed(2)}</td>
                               <td className="p-2">
                                 {product.image ? (
                                   <img 
@@ -1631,7 +1631,7 @@ function AdminPageContent() {
                     </div>
                   ) : (
                     <>
-                      <p className="text-3xl font-bold text-white">€{availableCash.toFixed(2)}</p>
+                      <p className="text-3xl font-bold text-white">N{availableCash.toFixed(2)}</p>
                       <p className="text-xs text-slate-400 mt-1">Dinheiro disponível para comprar stock</p>
                     </>
                   )}
@@ -1641,31 +1641,31 @@ function AdminPageContent() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="bg-slate-700 rounded-lg p-4">
                     <label className="block text-slate-300 mb-2 text-sm">Valor em Stock</label>
-                    <p className="text-3xl font-bold text-blue-400">€{totalStockValue.toFixed(2)}</p>
+                    <p className="text-3xl font-bold text-blue-400">N{totalStockValue.toFixed(2)}</p>
                     <p className="text-xs text-slate-400 mt-1">Custo total do stock atual (preço de compra)</p>
                   </div>
                   
                   <div className="bg-slate-700 rounded-lg p-4">
                     <label className="block text-slate-300 mb-2 text-sm">Lucro Esperado</label>
-                    <p className="text-3xl font-bold text-yellow-400">€{expectedProfit.toFixed(2)}</p>
+                    <p className="text-3xl font-bold text-yellow-400">N{expectedProfit.toFixed(2)}</p>
                     <p className="text-xs text-slate-400 mt-1">Se todos comprarem como sócios (preço sócio - preço compra) × stock</p>
                   </div>
                   
                   <div className="bg-slate-700 rounded-lg p-4">
                     <label className="block text-slate-300 mb-2 text-sm">Lucro Real</label>
-                    <p className="text-3xl font-bold text-green-400">€{actualProfit.toFixed(2)}</p>
+                    <p className="text-3xl font-bold text-green-400">N{actualProfit.toFixed(2)}</p>
                     <p className="text-xs text-slate-400 mt-1">Receita - Custo das mercadorias vendidas</p>
                   </div>
                   
                   <div className="bg-slate-700 rounded-lg p-4">
                     <label className="block text-slate-300 mb-2 text-sm">Valor Total em Saldo</label>
-                    <p className="text-3xl font-bold text-cyan-400">€{totalUserBalances.toFixed(2)}</p>
+                    <p className="text-3xl font-bold text-cyan-400">N{totalUserBalances.toFixed(2)}</p>
                     <p className="text-xs text-slate-400 mt-1">Soma dos saldos de todos os utilizadores</p>
                   </div>
                   
                   <div className="bg-slate-700 rounded-lg p-4">
                     <label className="block text-slate-300 mb-2 text-sm">Total Comprado</label>
-                    <p className="text-3xl font-bold text-purple-400">€{totalPurchased.toFixed(2)}</p>
+                    <p className="text-3xl font-bold text-purple-400">N{totalPurchased.toFixed(2)}</p>
                     <p className="text-xs text-slate-400 mt-1">Valor total de todas as compras no SNecc-Bar</p>
                   </div>
                 </div>
@@ -1676,18 +1676,18 @@ function AdminPageContent() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-slate-700 rounded-lg p-3">
                       <p className="text-xs text-slate-400 mb-1">Receita Total</p>
-                      <p className="text-xl font-bold text-white">€{totalRevenue.toFixed(2)}</p>
+                      <p className="text-xl font-bold text-white">N{totalRevenue.toFixed(2)}</p>
                     </div>
                     <div className="bg-slate-700 rounded-lg p-3">
                       <p className="text-xs text-slate-400 mb-1">Pago com Saldo</p>
-                      <p className="text-xl font-bold text-cyan-400">€{revenueFromBalance.toFixed(2)}</p>
+                      <p className="text-xl font-bold text-cyan-400">N{revenueFromBalance.toFixed(2)}</p>
                       <p className="text-xs text-slate-500 mt-1">
                         {totalRevenue > 0 ? ((revenueFromBalance / totalRevenue) * 100).toFixed(1) : 0}% do total
                       </p>
                     </div>
                     <div className="bg-slate-700 rounded-lg p-3">
                       <p className="text-xs text-slate-400 mb-1">Pago em Dinheiro</p>
-                      <p className="text-xl font-bold text-green-400">€{revenueFromCash.toFixed(2)}</p>
+                      <p className="text-xl font-bold text-green-400">N{revenueFromCash.toFixed(2)}</p>
                       <p className="text-xs text-slate-500 mt-1">
                         {totalRevenue > 0 ? ((revenueFromCash / totalRevenue) * 100).toFixed(1) : 0}% do total
                       </p>

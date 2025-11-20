@@ -324,7 +324,7 @@ function VendingMachineContent() {
       
       if (paymentMethod === 'balance') {
         await showAlert({
-          message: `Compra realizada com sucesso! ${cart.length} item(s) dispensado(s). Saldo restante: €${updatedUser?.balance.toFixed(2) || '0.00'}`,
+          message: `Compra realizada com sucesso! ${cart.length} item(s) dispensado(s). Saldo restante: N${updatedUser?.balance.toFixed(2) || '0.00'}`,
           type: 'success'
         })
       } else {
@@ -465,7 +465,7 @@ function VendingMachineContent() {
                         </h3>
                         <div className="flex items-center justify-between">
                           <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
-                            €{product.price.toFixed(2)}
+                            N{product.price.toFixed(2)}
                           </span>
                           {product.stock > 0 && (
                             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -526,7 +526,7 @@ function VendingMachineContent() {
                   <p className="text-slate-600 text-sm">{currentUser.email}</p>
                 )}
                 <p className="text-cyan-600 font-bold mt-2 text-lg">
-                  €{currentUser?.balance !== undefined ? currentUser.balance.toFixed(2) : "0.00"}
+                  N{currentUser?.balance !== undefined ? currentUser.balance.toFixed(2) : "0.00"}
                 </p>
                 {currentUser && (
                   <div className="mt-3 flex items-center gap-2 flex-wrap">
@@ -549,7 +549,7 @@ function VendingMachineContent() {
                 <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl p-4 text-center border border-cyan-200 shadow-sm">
                   <p className="text-xs text-slate-600 mb-2 font-medium">Total Gasto</p>
                   <p className="text-xl font-bold text-cyan-600">
-                    €{userOrders.reduce((sum, o) => sum + o.total, 0).toFixed(2)}
+                    N{userOrders.reduce((sum, o) => sum + o.total, 0).toFixed(2)}
                   </p>
                 </div>
                 <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl p-4 text-center border border-cyan-200 shadow-sm">
@@ -559,7 +559,7 @@ function VendingMachineContent() {
                 <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 text-center border border-green-200 shadow-sm">
                   <p className="text-xs text-slate-600 mb-2 font-medium">Total Depositado</p>
                   <p className="text-xl font-bold text-green-600">
-                    €{userDeposits.reduce((sum, d) => sum + d.amount, 0).toFixed(2)}
+                    N{userDeposits.reduce((sum, d) => sum + d.amount, 0).toFixed(2)}
                   </p>
                 </div>
                 <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 text-center border border-green-200 shadow-sm">
@@ -599,7 +599,7 @@ function VendingMachineContent() {
                                   minute: '2-digit'
                                 })}
                               </span>
-                              <span className="font-bold text-cyan-600 text-sm">€{order.total.toFixed(2)}</span>
+                              <span className="font-bold text-cyan-600 text-sm">N{order.total.toFixed(2)}</span>
                             </div>
                             <div className="text-slate-500 truncate mb-1">
                               {order.items.map((item, idx) => (
@@ -640,7 +640,7 @@ function VendingMachineContent() {
                                 })}
                               </span>
                               <span className={`font-bold text-sm ${deposit.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {deposit.amount >= 0 ? '+' : ''}€{deposit.amount.toFixed(2)}
+                                {deposit.amount >= 0 ? '+' : ''}N{deposit.amount.toFixed(2)}
                               </span>
                             </div>
                             <div className="text-slate-400 text-xs">
@@ -738,7 +738,7 @@ function VendingMachineContent() {
                       />
                       <div className="flex-1">
                         <p className="font-bold text-slate-800">{item.product.name}</p>
-                        <p className="text-sm text-slate-500">€{item.product.price.toFixed(2)} cada</p>
+                        <p className="text-sm text-slate-500">N{item.product.price.toFixed(2)} cada</p>
                       </div>
                       <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
                         <Button
@@ -774,11 +774,11 @@ function VendingMachineContent() {
                 <div className="border-t-2 border-slate-200 pt-6 space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-lg font-semibold text-slate-700">Total:</span>
-                    <span className="text-3xl font-bold bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">€{getCartTotal().toFixed(2)}</span>
+                    <span className="text-3xl font-bold bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">N{getCartTotal().toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-cyan-50 rounded-xl border border-cyan-200">
                     <span className="text-sm text-slate-600 font-medium">Saldo Disponível:</span>
-                    <span className="font-bold text-slate-800">€{currentUser?.balance.toFixed(2) || "0.00"}</span>
+                    <span className="font-bold text-slate-800">N{currentUser?.balance.toFixed(2) || "0.00"}</span>
                   </div>
                   <Button
                     onClick={handleCheckout}
@@ -820,14 +820,14 @@ function VendingMachineContent() {
                       {item.product.name} x{item.quantity}
                     </span>
                     <span className="font-bold text-slate-800">
-                      €{(item.product.price * item.quantity).toFixed(2)}
+                      N{(item.product.price * item.quantity).toFixed(2)}
                     </span>
                   </div>
                 ))}
               </div>
               <div className="border-t-2 border-slate-200 mt-4 pt-4 flex justify-between items-center">
                 <span className="font-bold text-slate-800 text-lg">Total:</span>
-                <span className="text-2xl font-bold bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">€{getCartTotal().toFixed(2)}</span>
+                <span className="text-2xl font-bold bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">N{getCartTotal().toFixed(2)}</span>
               </div>
             </div>
 
@@ -857,7 +857,7 @@ function VendingMachineContent() {
             {!isCashPayment && (
               <div className="flex justify-between items-center mb-6 text-sm p-4 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-xl border border-cyan-200 shadow-sm">
                 <span className="text-slate-600 font-medium">Saldo Disponível:</span>
-                <span className="font-bold text-slate-800 text-lg">€{currentUser?.balance.toFixed(2) || "0.00"}</span>
+                <span className="font-bold text-slate-800 text-lg">N{currentUser?.balance.toFixed(2) || "0.00"}</span>
               </div>
             )}
 
