@@ -425,14 +425,13 @@ export async function addOrder(
       await updateUserBalance(userId, newBalance)
     }
 
-    if (paymentMethod === 'cash') {
-      const currentAvailableCash = await getAvailableCash()
-      const newAvailableCash = Math.round((currentAvailableCash + total) * 100) / 100
-      await updateAvailableCash(newAvailableCash)
-    }
+    // NOTA: Para pagamento em dinheiro, o available_cash é atualizado automaticamente
+    // pelo trigger na base de dados quando payment_processed é atualizado para true
+    // Não precisamos atualizar manualmente aqui
 
     // Processar pagamento no servidor usando função stored procedure
     // Esta função atualiza payment_processed E cria inventory_movements numa transação atómica
+    // O trigger também atualiza available_cash automaticamente se payment_method = 'cash'
     // É mais seguro porque tudo acontece no servidor, não no cliente
     const { error: processError } = await supabase.rpc('process_order_payment', {
       p_order_id: order.id,
@@ -694,19 +693,11 @@ export async function deleteOrder(orderId: string): Promise<void> {
       }
     }
 
-    // If payment was by cash, subtract from available cash
-    if (order.payment_method === 'cash') {
-      const currentAvailableCash = await getAvailableCash()
-      const orderTotal = parseFloat(order.total)
-      const newAvailableCash = Math.round((currentAvailableCash - orderTotal) * 100) / 100
-      
-      // Check if available cash would go negative
-      if (newAvailableCash < 0) {
-        throw new Error('Não é possível apagar esta encomenda. O valor disponível ficaria negativo.')
-      }
-      
-      await updateAvailableCash(newAvailableCash)
-    }
+    // NOTA: Para pagamento em dinheiro, o available_cash é revertido automaticamente
+    // pelo trigger na base de dados quando a ordem é deletada
+    // NÃO atualizar manualmente aqui - o trigger cuida disso automaticamente
+    // Se tentarmos atualizar manualmente, será removido duas vezes (uma vez manualmente e uma vez pelo trigger)
+    // Isso é especialmente problemático para admins que têm permissões RLS para atualizar available_cash
 
     // Get order items with their IDs first
     const { data: orderItems, error: itemsFetchError } = await supabase
