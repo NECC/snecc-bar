@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LogOut, Users, ShoppingCart, Package, Calendar, TrendingUp, DollarSign, BarChart3, HelpCircle, X, Trash2, Home } from "lucide-react"
-import { getCurrentUser, getUsers, getOrders, getProducts, updateUserBalance, addProductStock, logout, getTotalDeposits, updateProduct, addProduct, deleteProduct, updateUserMember, addDeposit, getDeposits, updateUser, isAdmin, getAvailableCash, updateAvailableCash, deleteOrder, deleteDeposit, type User as UserType, type Order, type Product as ProductType, type Deposit } from "@/lib/auth"
+import { getCurrentUser, getUsers, getOrders, getProducts, updateUserBalance, addProductStock, logout, getTotalDeposits, updateProduct, addProduct, deleteProduct, restoreProduct, getInactiveProducts, updateUserMember, addDeposit, getDeposits, updateUser, isAdmin, getAvailableCash, updateAvailableCash, deleteOrder, deleteDeposit, type User as UserType, type Order, type Product as ProductType, type Deposit } from "@/lib/auth"
 import { supabase } from "@/app/config/supabaseClient"
 import { AlertProvider, useAlert } from "@/components/ui/alert-dialog"
 
@@ -38,6 +38,8 @@ function AdminPageContent() {
   const [users, setUsers] = useState<User[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [inactiveProducts, setInactiveProducts] = useState<Product[]>([])
+  const [showInactiveProducts, setShowInactiveProducts] = useState<boolean>(false)
   const [deposits, setDeposits] = useState<Deposit[]>([])
   const [selectedUserId, setSelectedUserId] = useState<string>("")
   const [balanceAmount, setBalanceAmount] = useState<string>("")
@@ -135,6 +137,17 @@ function AdminPageContent() {
     setOrders(ordersData)
     const productsData = await getProducts()
     setProducts(productsData.map(p => ({
+      id: p.id,
+      name: p.name,
+      purchasePrice: p.purchasePrice,
+      sellingPriceMember: p.sellingPriceMember,
+      sellingPriceNonMember: p.sellingPriceNonMember,
+      stock: p.stock,
+      image: p.image,
+    })))
+    // Load inactive products
+    const inactiveProductsData = await getInactiveProducts()
+    setInactiveProducts(inactiveProductsData.map(p => ({
       id: p.id,
       name: p.name,
       purchasePrice: p.purchasePrice,
@@ -312,14 +325,53 @@ function AdminPageContent() {
   const handleDeleteProduct = async (productId: string) => {
     const confirmed = await showConfirm({
       title: "Confirmar Remoção",
-      message: "Tem certeza que deseja remover este produto?",
+      message: "Tem certeza que deseja remover este produto? O produto será ocultado mas mantido no histórico de encomendas.",
       type: 'warning',
       confirmText: 'Remover',
       cancelText: 'Cancelar'
     })
     if (!confirmed) return
-    await deleteProduct(productId)
-    loadData()
+    
+    try {
+      await deleteProduct(productId)
+      await showAlert({
+        message: 'Produto removido com sucesso. Pode restaurá-lo mais tarde se necessário.',
+        type: 'success'
+      })
+      loadData()
+    } catch (error: any) {
+      console.error('Error deleting product:', error)
+      await showAlert({
+        message: error?.message || 'Erro ao remover produto',
+        type: 'error'
+      })
+    }
+  }
+
+  const handleRestoreProduct = async (productId: string) => {
+    const confirmed = await showConfirm({
+      title: "Confirmar Restauração",
+      message: "Tem certeza que deseja restaurar este produto?",
+      type: 'info',
+      confirmText: 'Restaurar',
+      cancelText: 'Cancelar'
+    })
+    if (!confirmed) return
+    
+    try {
+      await restoreProduct(productId)
+      await showAlert({
+        message: 'Produto restaurado com sucesso',
+        type: 'success'
+      })
+      loadData()
+    } catch (error: any) {
+      console.error('Error restoring product:', error)
+      await showAlert({
+        message: error?.message || 'Erro ao restaurar produto',
+        type: 'error'
+      })
+    }
   }
 
   const handleCancelEdit = () => {
@@ -1570,6 +1622,87 @@ function AdminPageContent() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Inactive Products Section */}
+                {inactiveProducts.length > 0 && (
+                  <div className="mt-8 pt-8 border-t border-slate-700">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-200 mb-1">
+                          Produtos Removidos ({inactiveProducts.length})
+                        </h3>
+                        <p className="text-sm text-slate-400">
+                          Produtos que foram removidos mas mantidos no histórico de encomendas
+                        </p>
+                      </div>
+                      <Button
+                        onClick={() => setShowInactiveProducts(!showInactiveProducts)}
+                        variant="outline"
+                        size="sm"
+                        className="bg-slate-600 hover:bg-slate-500"
+                      >
+                        {showInactiveProducts ? 'Ocultar' : 'Mostrar'}
+                      </Button>
+                    </div>
+
+                    {showInactiveProducts && (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-slate-200 min-w-[600px] opacity-75">
+                          <thead>
+                            <tr className="border-b border-slate-700">
+                              <th className="text-left p-2">Nome</th>
+                              <th className="text-left p-2">Compra</th>
+                              <th className="text-left p-2">Venda Membro</th>
+                              <th className="text-left p-2">Venda Não-Membro</th>
+                              <th className="text-left p-2">Stock</th>
+                              <th className="text-left p-2">Imagem</th>
+                              <th className="text-left p-2">Ações</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {inactiveProducts.map((product) => (
+                              <tr key={product.id} className="border-b border-slate-700">
+                                <td className="p-2 font-medium text-slate-400">{product.name}</td>
+                                <td className="p-2 text-slate-400">N{product.purchasePrice.toFixed(2)}</td>
+                                <td className="p-2 text-slate-400">N{product.sellingPriceMember.toFixed(2)}</td>
+                                <td className="p-2 text-slate-400">N{product.sellingPriceNonMember.toFixed(2)}</td>
+                                <td className="p-2 text-slate-400">{product.stock}</td>
+                                <td className="p-2">
+                                  {product.image ? (
+                                    <img 
+                                      src={product.image} 
+                                      alt={product.name} 
+                                      className="w-10 h-10 object-cover rounded opacity-50"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement
+                                        if (!target.dataset.fallbackAttempted && !target.src.includes('data:image')) {
+                                          target.dataset.fallbackAttempted = 'true'
+                                          target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2U1ZTdlYiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTYiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='
+                                        }
+                                      }}
+                                    />
+                                  ) : (
+                                    <span className="text-slate-500 text-xs">Sem imagem</span>
+                                  )}
+                                </td>
+                                <td className="p-2">
+                                  <Button
+                                    onClick={() => handleRestoreProduct(product.id)}
+                                    variant="outline"
+                                    size="sm"
+                                    className="bg-green-600 hover:bg-green-700 text-white"
+                                  >
+                                    Restaurar
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

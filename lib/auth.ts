@@ -34,6 +34,7 @@ export interface Product {
   purchasePrice: number
   sellingPriceMember: number
   sellingPriceNonMember: number
+  isActive?: boolean
 }
 
 export interface Deposit {
@@ -452,12 +453,23 @@ export async function addOrder(
   }
 }
 
-export async function getProducts(): Promise<Product[]> {
+export async function getProducts(includeInactive: boolean = false): Promise<Product[]> {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('products')
       .select('*')
-      .order('created_at', { ascending: false })
+
+    // Filter out inactive products by default (unless explicitly requested)
+    // If is_active column doesn't exist, this will still work (null/undefined = active)
+    if (!includeInactive) {
+      // Filter to show only active products (is_active = true or null)
+      // Using .or() with proper Supabase syntax
+      query = query.or('is_active.is.null,is_active.eq.true')
+    }
+
+    query = query.order('created_at', { ascending: false })
+
+    const { data, error } = await query
 
     if (error) {
       console.error('Error fetching products:', error)
@@ -472,6 +484,7 @@ export async function getProducts(): Promise<Product[]> {
       purchasePrice: parseFloat(p.purchase_price) || 0,
       sellingPriceMember: parseFloat(p.selling_price_member) || 0,
       sellingPriceNonMember: parseFloat(p.selling_price_non_member) || 0,
+      isActive: p.is_active !== false, // Default to true if null/undefined
     }))
   } catch (error) {
     console.error('Error in getProducts:', error)
@@ -561,18 +574,102 @@ export async function addProduct(product: Omit<Product, 'id'>) {
 
 export async function deleteProduct(productId: string) {
   try {
+    // Use soft delete: mark product as inactive instead of deleting
+    // This preserves order history while hiding the product from the catalog
     const { error } = await supabase
       .from('products')
-      .delete()
+      .update({ is_active: false })
       .eq('id', productId)
 
     if (error) {
       console.error('Error deleting product:', error)
+      // If is_active column doesn't exist, try to create it or fall back to hard delete
+      if (error.message?.includes('column') && error.message?.includes('is_active')) {
+        // Column doesn't exist - we need to add it to the database first
+        // For now, try hard delete if no references exist
+        const { data: orderItems, error: checkError } = await supabase
+          .from('order_items')
+          .select('id')
+          .eq('product_id', productId)
+          .limit(1)
+
+        if (checkError) {
+          throw new Error('Erro ao verificar referências do produto. Por favor, adicione o campo "is_active" à tabela products na base de dados.')
+        }
+
+        if (orderItems && orderItems.length > 0) {
+          throw new Error('Não é possível remover este produto porque está referenciado em encomendas existentes. Por favor, adicione o campo "is_active" à tabela products para usar soft delete.')
+        }
+
+        // If no references, proceed with hard delete
+        const { error: deleteError } = await supabase
+          .from('products')
+          .delete()
+          .eq('id', productId)
+
+        if (deleteError) {
+          if (deleteError.code === '23503') {
+            throw new Error('Não é possível remover este produto porque está referenciado em encomendas existentes. Por favor, adicione o campo "is_active" à tabela products para usar soft delete.')
+          }
+          throw new Error(`Erro ao remover produto: ${deleteError.message}`)
+        }
+      } else {
+        throw new Error(`Erro ao remover produto: ${error.message}`)
+      }
+    }
+  } catch (error: any) {
+    console.error('Error in deleteProduct:', error)
+    // If it's already a user-friendly error message, re-throw it
+    if (error.message && !error.message.includes('Erro ao')) {
       throw error
     }
+    throw new Error(error.message || 'Erro ao remover produto')
+  }
+}
+
+export async function restoreProduct(productId: string) {
+  try {
+    const { error } = await supabase
+      .from('products')
+      .update({ is_active: true })
+      .eq('id', productId)
+
+    if (error) {
+      console.error('Error restoring product:', error)
+      throw new Error(`Erro ao restaurar produto: ${error.message}`)
+    }
+  } catch (error: any) {
+    console.error('Error in restoreProduct:', error)
+    throw new Error(error.message || 'Erro ao restaurar produto')
+  }
+}
+
+export async function getInactiveProducts(): Promise<Product[]> {
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('is_active', false)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching inactive products:', error)
+      return []
+    }
+
+    return (data || []).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      image: p.image || '',
+      stock: p.stock || 0,
+      purchasePrice: parseFloat(p.purchase_price) || 0,
+      sellingPriceMember: parseFloat(p.selling_price_member) || 0,
+      sellingPriceNonMember: parseFloat(p.selling_price_non_member) || 0,
+      isActive: p.is_active !== false,
+    }))
   } catch (error) {
-    console.error('Error in deleteProduct:', error)
-    throw error
+    console.error('Error in getInactiveProducts:', error)
+    return []
   }
 }
 
