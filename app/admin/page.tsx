@@ -6,8 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { LogOut, Users, ShoppingCart, Package, Calendar, TrendingUp, DollarSign, BarChart3, HelpCircle, X, Trash2, Home } from "lucide-react"
-import { getCurrentUser, getUsers, getOrders, getProducts, updateUserBalance, addProductStock, logout, getTotalDeposits, updateProduct, addProduct, deleteProduct, restoreProduct, getInactiveProducts, updateUserMember, addDeposit, getDeposits, updateUser, isAdmin, getAvailableCash, updateAvailableCash, deleteOrder, deleteDeposit, type User as UserType, type Order, type Product as ProductType, type Deposit } from "@/lib/auth"
+import { LogOut, Users, ShoppingCart, Package, Calendar, TrendingUp, DollarSign, BarChart3, HelpCircle, X, Trash2, Home, Wallet, AlertTriangle } from "lucide-react"
+import { getCurrentUser, getUsers, getOrders, getProducts, updateUserBalance, addProductStock, logout, getTotalDeposits, updateProduct, addProduct, deleteProduct, restoreProduct, getInactiveProducts, updateUserMember, addDeposit, getDeposits, updateUser, isAdmin, getAvailableCash, updateAvailableCash, deleteOrder, deleteDeposit, getAvailableCashLogs, getTheftRecords, deleteTheftRecord, type User as UserType, type Order, type Product as ProductType, type Deposit, type AvailableCashLog, type TheftRecord } from "@/lib/auth"
 import { supabase } from "@/app/config/supabaseClient"
 import { AlertProvider, useAlert } from "@/components/ui/alert-dialog"
 
@@ -41,6 +41,7 @@ function AdminPageContent() {
   const [inactiveProducts, setInactiveProducts] = useState<Product[]>([])
   const [showInactiveProducts, setShowInactiveProducts] = useState<boolean>(false)
   const [deposits, setDeposits] = useState<Deposit[]>([])
+  const [theftRecords, setTheftRecords] = useState<TheftRecord[]>([])
   const [selectedUserId, setSelectedUserId] = useState<string>("")
   const [balanceAmount, setBalanceAmount] = useState<string>("")
   const [depositMethod, setDepositMethod] = useState<'cash' | 'mbway' | 'adjustment'>('cash')
@@ -50,14 +51,19 @@ function AdminPageContent() {
   const [totalDeposits, setTotalDeposits] = useState<number>(0)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [editingProductOriginalStock, setEditingProductOriginalStock] = useState<number>(0)
+  const [markAsStolen, setMarkAsStolen] = useState<boolean>(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [editingUserOriginalBalance, setEditingUserOriginalBalance] = useState<number>(0)
   const [selectedUserForDetails, setSelectedUserForDetails] = useState<string | null>(null)
-  const [transactionFilter, setTransactionFilter] = useState<'all' | 'orders' | 'deposits'>('all')
+  const [transactionFilter, setTransactionFilter] = useState<'all' | 'orders' | 'deposits' | 'cash_adjustments' | 'thefts'>('all')
   const [transactionUserFilter, setTransactionUserFilter] = useState<string>('all')
   const [transactionUserSearchQuery, setTransactionUserSearchQuery] = useState<string>("")
   const [showTransactionUserSuggestions, setShowTransactionUserSuggestions] = useState<boolean>(false)
   const transactionSearchRef = useRef<HTMLDivElement>(null)
+  const [transactionProductFilter, setTransactionProductFilter] = useState<string>('all')
+  const [transactionProductSearchQuery, setTransactionProductSearchQuery] = useState<string>("")
+  const [showTransactionProductSuggestions, setShowTransactionProductSuggestions] = useState<boolean>(false)
+  const transactionProductSearchRef = useRef<HTMLDivElement>(null)
   const [newProduct, setNewProduct] = useState<{ 
     name: string
     purchasePrice: string
@@ -80,9 +86,19 @@ function AdminPageContent() {
   const [availableCash, setAvailableCash] = useState<number>(0)
   const [editingAvailableCash, setEditingAvailableCash] = useState<boolean>(false)
   const [availableCashInput, setAvailableCashInput] = useState<string>("")
+  const [availableCashReason, setAvailableCashReason] = useState<string>("")
+  const [availableCashLogs, setAvailableCashLogs] = useState<AvailableCashLog[]>([])
   const [showHelpModal, setShowHelpModal] = useState<boolean>(false)
   const balanceSearchRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  
+  // Pagination states for users
+  const [usersItemsPerPage, setUsersItemsPerPage] = useState<number>(10)
+  const [usersCurrentPage, setUsersCurrentPage] = useState<number>(1)
+  
+  // Pagination states for transactions
+  const [transactionsItemsPerPage, setTransactionsItemsPerPage] = useState<number>(10)
+  const [transactionsCurrentPage, setTransactionsCurrentPage] = useState<number>(1)
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -92,6 +108,9 @@ function AdminPageContent() {
       }
       if (transactionSearchRef.current && !transactionSearchRef.current.contains(event.target as Node)) {
         setShowTransactionUserSuggestions(false)
+      }
+      if (transactionProductSearchRef.current && !transactionProductSearchRef.current.contains(event.target as Node)) {
+        setShowTransactionProductSuggestions(false)
       }
     }
 
@@ -162,6 +181,10 @@ function AdminPageContent() {
     setTotalDeposits(totalDepositsAmount)
     const availableCashAmount = await getAvailableCash()
     setAvailableCash(availableCashAmount)
+    const cashLogs = await getAvailableCashLogs()
+    setAvailableCashLogs(cashLogs)
+    const thefts = await getTheftRecords()
+    setTheftRecords(thefts)
   }
 
   const handleLogout = () => {
@@ -236,6 +259,7 @@ function AdminPageContent() {
   const handleEditProduct = (product: Product) => {
     setEditingProduct({ ...product })
     setEditingProductOriginalStock(product.stock)
+    setMarkAsStolen(false) // Reset checkbox when editing
     setIsAddingProduct(false)
   }
 
@@ -266,12 +290,29 @@ function AdminPageContent() {
       // Update stock if it changed
       const stockDifference = editingProduct.stock - editingProductOriginalStock
       if (stockDifference !== 0) {
-        await addProductStock(editingProduct.id, stockDifference, 'correction')
+        // If stock decreased and marked as stolen, use 'theft' type
+        // Otherwise use 'correction' for any stock change
+        const movementType = stockDifference < 0 && markAsStolen ? 'theft' : 'correction'
+        console.log('Updating stock:', { stockDifference, movementType, markAsStolen })
+        try {
+          // Pass adminId when it's a theft so we can track who marked it as stolen
+          const adminId = movementType === 'theft' && currentUser ? currentUser.id : undefined
+          await addProductStock(editingProduct.id, stockDifference, movementType, adminId)
+        } catch (stockError: any) {
+          console.error('Error updating stock:', stockError)
+          await showAlert({
+            message: `Erro ao atualizar stock: ${stockError?.message || 'Erro desconhecido'}`,
+            type: 'error'
+          })
+          return // Don't continue if stock update fails
+        }
       }
 
       setEditingProduct(null)
       setEditingProductOriginalStock(0)
-      loadData()
+      setMarkAsStolen(false)
+      // Reload data to get updated stock and theft records
+      await loadData()
     } catch (error) {
       console.error('Error saving product:', error)
       await showAlert({
@@ -377,6 +418,7 @@ function AdminPageContent() {
   const handleCancelEdit = () => {
     setEditingProduct(null)
     setEditingProductOriginalStock(0)
+    setMarkAsStolen(false)
     setIsAddingProduct(false)
     setNewProduct({ name: "", purchasePrice: "", sellingPriceMember: "", sellingPriceNonMember: "", stock: "", image: "" })
   }
@@ -440,10 +482,16 @@ function AdminPageContent() {
     }
     
     try {
-      await updateAvailableCash(amount)
+      const reason = availableCashReason.trim() || 'Ajuste manual pelo administrador'
+      const adminId = currentUser?.id
+      await updateAvailableCash(amount, reason, adminId)
       setAvailableCash(amount)
       setEditingAvailableCash(false)
       setAvailableCashInput("")
+      setAvailableCashReason("")
+      // Reload logs after update
+      const cashLogs = await getAvailableCashLogs()
+      setAvailableCashLogs(cashLogs)
     } catch (error) {
       console.error('Error updating available cash:', error)
       await showAlert({
@@ -461,15 +509,38 @@ function AdminPageContent() {
   const handleCancelEditAvailableCash = () => {
     setEditingAvailableCash(false)
     setAvailableCashInput("")
+    setAvailableCashReason("")
   }
   
   const handleDeleteTransaction = async (transaction: Transaction) => {
-    const transactionType = transaction.type === 'order' ? 'encomenda' : 'depósito'
-    const confirmMessage = `Tem certeza que deseja apagar esta ${transactionType}?\n\n` +
-      `Usuário: ${transaction.userName}\n` +
-      `Valor: N${Math.abs(transaction.amount).toFixed(2)}\n` +
-      `Data: ${new Date(transaction.timestamp).toLocaleString('pt-PT')}\n\n` +
-      `Esta ação irá reverter todas as alterações (saldo, stock, etc.) e não pode ser desfeita.`
+    let transactionType: string
+    let confirmMessage: string
+    
+    if (transaction.type === 'order') {
+      transactionType = 'encomenda'
+      confirmMessage = `Tem certeza que deseja apagar esta ${transactionType}?\n\n` +
+        `Usuário: ${transaction.userName}\n` +
+        `Valor: N${Math.abs(transaction.amount).toFixed(2)}\n` +
+        `Data: ${new Date(transaction.timestamp).toLocaleString('pt-PT')}\n\n` +
+        `Esta ação irá reverter todas as alterações (saldo, stock, etc.) e não pode ser desfeita.`
+    } else if (transaction.type === 'deposit') {
+      transactionType = 'depósito'
+      confirmMessage = `Tem certeza que deseja apagar este ${transactionType}?\n\n` +
+        `Usuário: ${transaction.userName}\n` +
+        `Valor: N${Math.abs(transaction.amount).toFixed(2)}\n` +
+        `Data: ${new Date(transaction.timestamp).toLocaleString('pt-PT')}\n\n` +
+        `Esta ação irá reverter todas as alterações (saldo, stock, etc.) e não pode ser desfeita.`
+    } else if (transaction.type === 'theft') {
+      transactionType = 'roubo/perda'
+      confirmMessage = `Tem certeza que deseja apagar este registro de ${transactionType}?\n\n` +
+        `Produto: ${transaction.details}\n` +
+        `Valor: N${Math.abs(transaction.amount).toFixed(2)}\n` +
+        `Data: ${new Date(transaction.timestamp).toLocaleString('pt-PT')}\n\n` +
+        `Esta ação irá restaurar o stock e não pode ser desfeita.`
+    } else {
+      // Cash adjustments cannot be deleted
+      return
+    }
     
     const confirmed = await showConfirm({
       title: `Apagar ${transactionType.charAt(0).toUpperCase() + transactionType.slice(1)}`,
@@ -486,12 +557,14 @@ function AdminPageContent() {
     try {
       if (transaction.type === 'order') {
         await deleteOrder(transaction.id)
-      } else {
+      } else if (transaction.type === 'deposit') {
         await deleteDeposit(transaction.id)
+      } else if (transaction.type === 'theft') {
+        await deleteTheftRecord(transaction.id)
       }
       loadData()
       await showAlert({
-        message: `${transactionType.charAt(0).toUpperCase() + transactionType.slice(1)} apagada com sucesso!`,
+        message: `${transactionType.charAt(0).toUpperCase() + transactionType.slice(1)} apagado com sucesso!`,
         type: 'success'
       })
     } catch (error: any) {
@@ -522,6 +595,17 @@ function AdminPageContent() {
       user.email.toLowerCase().includes(query)
     )
   })
+  
+  // Pagination for users
+  const usersTotalPages = Math.ceil(filteredUsers.length / usersItemsPerPage)
+  const usersStartIndex = (usersCurrentPage - 1) * usersItemsPerPage
+  const usersEndIndex = usersStartIndex + usersItemsPerPage
+  const paginatedUsers = filteredUsers.slice(usersStartIndex, usersEndIndex)
+  
+  // Reset to page 1 when items per page changes or search changes
+  useEffect(() => {
+    setUsersCurrentPage(1)
+  }, [usersItemsPerPage, userSearchQuery])
 
   const handleToggleNeccMember = async (userId: string, currentStatus: boolean) => {
     try {
@@ -539,6 +623,7 @@ function AdminPageContent() {
   const handleEditUser = (user: User) => {
     setEditingUser({ ...user })
     setEditingUserOriginalBalance(user.balance)
+    setSelectedUserForDetails(null) // Close details when opening edit
   }
 
   const handleSaveUser = async () => {
@@ -589,47 +674,134 @@ function AdminPageContent() {
     setEditingUserOriginalBalance(0)
   }
 
-  // Combine orders and deposits for transactions view
+  // Combine orders, deposits, cash adjustments, and thefts for transactions view
   type Transaction = {
     id: string
-    type: 'order' | 'deposit'
-    userId: string
+    type: 'order' | 'deposit' | 'cash_adjustment' | 'theft'
+    userId?: string
     userName: string
     amount: number
+    previousValue: number
+    newValue: number
     timestamp: string
     details: string
     paymentMethod?: string
   }
 
   const allTransactions: Transaction[] = [
-    ...orders.map(order => ({
-      id: order.id,
-      type: 'order' as const,
-      userId: order.userId,
-      userName: order.userName || users.find(u => u.id === order.userId)?.name || 'Unknown',
-      amount: -order.total, // Negative for expenses
-      timestamp: order.timestamp,
-      details: order.items.map(item => `${item.productName} x${item.quantity}`).join(', '),
-      paymentMethod: order.paymentMethod,
+    ...orders.map(order => {
+      const user = users.find(u => u.id === order.userId)
+      const currentBalance = user?.balance || 0
+      // For orders paid with balance: previous = current + total, new = current
+      // For orders paid with cash: previous = current, new = current (no balance change)
+      const previousBalance = order.paymentMethod === 'balance' 
+        ? Math.round((currentBalance + order.total) * 100) / 100
+        : currentBalance
+      return {
+        id: order.id,
+        type: 'order' as const,
+        userId: order.userId,
+        userName: order.userName || user?.name || 'Unknown',
+        amount: -order.total, // Negative for expenses
+        previousValue: previousBalance,
+        newValue: currentBalance,
+        timestamp: order.timestamp,
+        details: order.items.map(item => `${item.productName} x${item.quantity}`).join(', '),
+        paymentMethod: order.paymentMethod,
+      }
+    }),
+    ...deposits.map(deposit => {
+      const user = users.find(u => u.id === deposit.userId)
+      const currentBalance = user?.balance || 0
+      // For deposits: previous = current - amount, new = current
+      const previousBalance = Math.round((currentBalance - deposit.amount) * 100) / 100
+      return {
+        id: deposit.id,
+        type: 'deposit' as const,
+        userId: deposit.userId,
+        userName: user?.name || 'Unknown',
+        amount: deposit.amount, // Positive for deposits
+        previousValue: previousBalance,
+        newValue: currentBalance,
+        timestamp: deposit.timestamp,
+        details: deposit.method === 'cash' ? 'Dinheiro' : deposit.method === 'mbway' ? 'MB Way' : 'Ajuste',
+      }
+    }),
+    ...availableCashLogs.map(log => ({
+      id: log.id,
+      type: 'cash_adjustment' as const,
+      userId: undefined, // Cash adjustments don't have a user
+      userName: log.adminName || 'Sistema',
+      amount: log.difference, // Can be positive or negative
+      previousValue: log.previousAmount,
+      newValue: log.newAmount,
+      timestamp: log.timestamp,
+      details: log.reason || 'Ajuste manual',
     })),
-    ...deposits.map(deposit => ({
-      id: deposit.id,
-      type: 'deposit' as const,
-      userId: deposit.userId,
-      userName: users.find(u => u.id === deposit.userId)?.name || 'Unknown',
-      amount: deposit.amount, // Positive for deposits
-      timestamp: deposit.timestamp,
-      details: deposit.method === 'cash' ? 'Dinheiro' : deposit.method === 'mbway' ? 'MB Way' : 'Ajuste',
-    })),
+    ...theftRecords.map(theft => {
+      const product = products.find(p => p.id === theft.productId)
+      const productValue = product ? product.purchasePrice * theft.quantity : 0
+      // For thefts: previous stock = current stock + stolen quantity, new stock = current stock
+      const previousStockValue = product ? (product.stock + theft.quantity) * product.purchasePrice : 0
+      const newStockValue = product ? product.stock * product.purchasePrice : 0
+      return {
+        id: theft.id,
+        type: 'theft' as const,
+        userId: undefined, // Thefts don't have a user
+        userName: theft.adminName || 'Sistema',
+        amount: -productValue, // Negative value (loss)
+        previousValue: previousStockValue,
+        newValue: newStockValue,
+        timestamp: theft.timestamp,
+        details: `${theft.productName} x${theft.quantity} (Roubado/Perdido)`,
+      }
+    }),
   ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
   // Filter transactions
   const filteredTransactions = allTransactions.filter(transaction => {
     if (transactionFilter === 'orders' && transaction.type !== 'order') return false
     if (transactionFilter === 'deposits' && transaction.type !== 'deposit') return false
-    if (transactionUserFilter !== 'all' && transaction.userId !== transactionUserFilter) return false
+    if (transactionFilter === 'cash_adjustments' && transaction.type !== 'cash_adjustment') return false
+    if (transactionFilter === 'thefts' && transaction.type !== 'theft') return false
+    if (transactionUserFilter !== 'all') {
+      // Cash adjustments and thefts don't have users, so exclude them when filtering by user
+      if (transaction.type === 'cash_adjustment' || transaction.type === 'theft') return false
+      if (transaction.userId !== transactionUserFilter) return false
+    }
+    if (transactionProductFilter !== 'all') {
+      // Filter by product for orders and thefts
+      if (transaction.type === 'order') {
+        const order = orders.find(o => o.id === transaction.id)
+        if (order) {
+          // Check if any item in the order matches the selected product
+          const hasProduct = order.items.some(item => item.productId === transactionProductFilter)
+          if (!hasProduct) return false
+        } else {
+          return false
+        }
+      } else if (transaction.type === 'theft') {
+        // For thefts, check if the product matches
+        const theft = theftRecords.find(t => t.id === transaction.id)
+        if (!theft || theft.productId !== transactionProductFilter) return false
+      } else {
+        // For deposits and cash adjustments, exclude them when filtering by product
+        return false
+      }
+    }
     return true
   })
+  
+  // Pagination for transactions
+  const transactionsTotalPages = Math.ceil(filteredTransactions.length / transactionsItemsPerPage)
+  const transactionsStartIndex = (transactionsCurrentPage - 1) * transactionsItemsPerPage
+  const transactionsEndIndex = transactionsStartIndex + transactionsItemsPerPage
+  const paginatedTransactions = filteredTransactions.slice(transactionsStartIndex, transactionsEndIndex)
+  
+  // Reset to page 1 when items per page changes or filters change
+  useEffect(() => {
+    setTransactionsCurrentPage(1)
+  }, [transactionsItemsPerPage, transactionFilter, transactionUserFilter, transactionProductFilter])
 
   if (!currentUser) return null
 
@@ -744,94 +916,10 @@ function AdminPageContent() {
                   onChange={(e) => setUserSearchQuery(e.target.value)}
                   className="bg-slate-700 text-white border-slate-600"
                 />
-                <div className="overflow-x-auto">
-                  <table className="w-full text-slate-200 min-w-[600px]">
-                    <thead>
-                      <tr className="border-b border-slate-700">
-                        <th className="text-left p-2">Name</th>
-                        <th className="text-left p-2">Email</th>
-                        <th className="text-left p-2">Balance</th>
-                        <th className="text-left p-2">Role</th>
-                        <th className="text-left p-2">Membro</th>
-                        <th className="text-left p-2">Criado em</th>
-                        <th className="text-left p-2">Estatísticas</th>
-                        <th className="text-left p-2">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredUsers.length === 0 ? (
-                        <tr>
-                          <td colSpan={8} className="p-4 text-center text-slate-400">
-                            Nenhum usuário encontrado
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredUsers.map((user) => {
-                          const stats = getUserStats(user.id)
-                          return (
-                            <tr key={user.id} className="border-b border-slate-700">
-                              <td className="p-2">{user.name}</td>
-                              <td className="p-2 text-sm">{user.email}</td>
-                              <td className="p-2">N{user.balance.toFixed(2)}</td>
-                              <td className="p-2">
-                                <span className={`px-2 py-1 rounded text-xs ${
-                                  user.role === 'admin' 
-                                    ? 'bg-purple-600 text-white' 
-                                    : 'bg-slate-600 text-white'
-                                }`}>
-                                  {user.role || 'user'}
-                                </span>
-                              </td>
-                              <td className="p-2">
-                                <span className={`px-2 py-1 rounded text-xs ${
-                                  user.isMember
-                                    ? 'bg-green-600 text-white'
-                                    : 'bg-slate-600 text-white'
-                                }`}>
-                                  {user.isMember ? 'Sim' : 'Não'}
-                                </span>
-                              </td>
-                              <td className="p-2 text-xs text-slate-400">
-                                {user.createdAt ? new Date(user.createdAt).toLocaleDateString('pt-PT') : '-'}
-                              </td>
-                              <td className="p-2">
-                                <div className="text-xs">
-                                  <div>Gasto: N{stats.totalSpent.toFixed(2)}</div>
-                                  <div>Depositado: N{stats.totalDeposited.toFixed(2)}</div>
-                                  <div>{stats.orderCount} encomendas</div>
-                                </div>
-                              </td>
-                              <td className="p-2">
-                                <div className="flex gap-2">
-                                  <Button
-                                    onClick={() => handleEditUser(user)}
-                                    variant="outline"
-                                    size="sm"
-                                    className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs"
-                                  >
-                                    Editar
-                                  </Button>
-                                  <Button
-                                    onClick={() => setSelectedUserForDetails(selectedUserForDetails === user.id ? null : user.id)}
-                                    variant="outline"
-                                    size="sm"
-                                    className="bg-slate-600 hover:bg-slate-500 text-xs"
-                                  >
-                                    {selectedUserForDetails === user.id ? 'Ocultar' : 'Detalhes'}
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          )
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
                 
                 {/* User Details */}
                 {selectedUserForDetails && (
-                  <Card className="bg-slate-700 border-slate-600 mt-4">
+                  <Card className="bg-slate-700 border-slate-600">
                     <CardHeader>
                       <CardTitle className="text-slate-200 text-lg">
                         Detalhes do Usuário: {users.find(u => u.id === selectedUserForDetails)?.name}
@@ -938,7 +1026,7 @@ function AdminPageContent() {
 
                 {/* Edit User Form */}
                 {editingUser && (
-                  <Card className="bg-slate-700 border-slate-600 mt-4">
+                  <Card className="bg-slate-700 border-slate-600">
                     <CardHeader>
                       <CardTitle className="text-slate-200 text-lg">Editar Usuário</CardTitle>
                     </CardHeader>
@@ -995,6 +1083,139 @@ function AdminPageContent() {
                     </CardContent>
                   </Card>
                 )}
+                
+                {/* Pagination Controls for Users */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-slate-300 whitespace-nowrap">Itens por página:</label>
+                    <select
+                      value={usersItemsPerPage}
+                      onChange={(e) => setUsersItemsPerPage(Number.parseInt(e.target.value))}
+                      className="px-3 py-1.5 bg-slate-700 text-white border border-slate-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={30}>30</option>
+                    </select>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => setUsersCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={usersCurrentPage === 1}
+                      variant="outline"
+                      size="sm"
+                      className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 disabled:opacity-50"
+                    >
+                      Anterior
+                    </Button>
+                    <span className="text-sm text-slate-300 px-3">
+                      Página {usersCurrentPage} de {usersTotalPages || 1}
+                    </span>
+                    <Button
+                      onClick={() => setUsersCurrentPage(prev => Math.min(usersTotalPages, prev + 1))}
+                      disabled={usersCurrentPage >= usersTotalPages}
+                      variant="outline"
+                      size="sm"
+                      className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 disabled:opacity-50"
+                    >
+                      Próxima
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="overflow-x-auto">
+                  <table className="w-full text-slate-200 min-w-[600px]">
+                    <thead>
+                      <tr className="border-b border-slate-700">
+                        <th className="text-left p-2">Name</th>
+                        <th className="text-left p-2">Email</th>
+                        <th className="text-left p-2">Balance</th>
+                        <th className="text-left p-2">Role</th>
+                        <th className="text-left p-2">Membro</th>
+                        <th className="text-left p-2">Criado em</th>
+                        <th className="text-left p-2">Estatísticas</th>
+                        <th className="text-left p-2">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedUsers.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="p-4 text-center text-slate-400">
+                            Nenhum usuário encontrado
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedUsers.map((user) => {
+                          const stats = getUserStats(user.id)
+                          return (
+                            <tr key={user.id} className="border-b border-slate-700">
+                              <td className="p-2">{user.name}</td>
+                              <td className="p-2 text-sm">{user.email}</td>
+                              <td className="p-2">N{user.balance.toFixed(2)}</td>
+                              <td className="p-2">
+                                <span className={`px-2 py-1 rounded text-xs ${
+                                  user.role === 'admin' 
+                                    ? 'bg-purple-600 text-white' 
+                                    : 'bg-slate-600 text-white'
+                                }`}>
+                                  {user.role || 'user'}
+                                </span>
+                              </td>
+                              <td className="p-2">
+                                <span className={`px-2 py-1 rounded text-xs ${
+                                  user.isMember
+                                    ? 'bg-green-600 text-white'
+                                    : 'bg-slate-600 text-white'
+                                }`}>
+                                  {user.isMember ? 'Sim' : 'Não'}
+                                </span>
+                              </td>
+                              <td className="p-2 text-xs text-slate-400">
+                                {user.createdAt ? new Date(user.createdAt).toLocaleDateString('pt-PT') : '-'}
+                              </td>
+                              <td className="p-2">
+                                <div className="text-xs">
+                                  <div>Gasto: N{stats.totalSpent.toFixed(2)}</div>
+                                  <div>Depositado: N{stats.totalDeposited.toFixed(2)}</div>
+                                  <div>{stats.orderCount} encomendas</div>
+                                </div>
+                              </td>
+                              <td className="p-2">
+                                <div className="flex gap-2">
+                                  <Button
+                                    onClick={() => handleEditUser(user)}
+                                    variant="outline"
+                                    size="sm"
+                                    className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs"
+                                  >
+                                    Editar
+                                  </Button>
+                                  <Button
+                                    onClick={() => {
+                                      const newDetailsId = selectedUserForDetails === user.id ? null : user.id
+                                      setSelectedUserForDetails(newDetailsId)
+                                      if (newDetailsId !== null) {
+                                        setEditingUser(null) // Close edit when opening details
+                                        setEditingUserOriginalBalance(0)
+                                      }
+                                    }}
+                                    variant="outline"
+                                    size="sm"
+                                    className="bg-slate-600 hover:bg-slate-500 text-xs"
+                                  >
+                                    {selectedUserForDetails === user.id ? 'Ocultar' : 'Detalhes'}
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1003,7 +1224,7 @@ function AdminPageContent() {
           <TabsContent value="transactions">
             <Card className="bg-slate-800 border-slate-700">
               <CardHeader>
-                <CardTitle className="text-slate-200">Transações (Compras e Depósitos)</CardTitle>
+                <CardTitle className="text-slate-200">Transações</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Filters */}
@@ -1047,98 +1268,251 @@ function AdminPageContent() {
                         <TrendingUp className="w-4 h-4 inline mr-1.5" />
                         Depósitos
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setTransactionFilter('cash_adjustments')}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                          transactionFilter === 'cash_adjustments'
+                            ? 'bg-yellow-500 text-white shadow-lg shadow-yellow-500/20'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600 border border-slate-600'
+                        }`}
+                      >
+                        <Wallet className="w-4 h-4 inline mr-1.5" />
+                        Ajustes de Cash
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTransactionFilter('thefts')}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                          transactionFilter === 'thefts'
+                            ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600 border border-slate-600'
+                        }`}
+                      >
+                        <AlertTriangle className="w-4 h-4 inline mr-1.5" />
+                        Roubos
+                      </button>
                     </div>
                   </div>
 
-                  {/* User Filter - Search */}
-                  <div className="relative" ref={transactionSearchRef}>
-                    <label className="block text-sm text-slate-300 mb-2">Filtrar por Utilizador</label>
-                    <Input
-                      type="text"
-                      placeholder="Pesquisar por nome ou email... (deixe vazio para todos)"
-                      value={transactionUserSearchQuery}
-                      onChange={(e) => {
-                        setTransactionUserSearchQuery(e.target.value)
-                        setShowTransactionUserSuggestions(true)
-                        if (e.target.value === "") {
-                          setTransactionUserFilter("all")
-                        }
-                      }}
-                      onFocus={() => {
-                        if (transactionUserSearchQuery) {
+                  {/* User and Product Filters - Side by Side */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* User Filter - Search */}
+                    <div className="relative" ref={transactionSearchRef}>
+                      <label className="block text-sm text-slate-300 mb-2">Filtrar por Utilizador</label>
+                      <Input
+                        type="text"
+                        placeholder="Pesquisar por nome ou email... (deixe vazio para todos)"
+                        value={transactionUserSearchQuery}
+                        onChange={(e) => {
+                          setTransactionUserSearchQuery(e.target.value)
                           setShowTransactionUserSuggestions(true)
-                        }
-                      }}
-                      className="bg-slate-700 text-white border-slate-600"
-                    />
-                    {showTransactionUserSuggestions && transactionUserSearchQuery && (
-                      <div className="absolute z-10 w-full mt-1 bg-slate-700 border border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto hide-scrollbar">
-                        <button
-                          type="button"
-                          onClick={() => {
+                          if (e.target.value === "") {
                             setTransactionUserFilter("all")
-                            setTransactionUserSearchQuery("")
-                            setShowTransactionUserSuggestions(false)
-                          }}
-                          className="w-full text-left px-4 py-2 hover:bg-slate-600 text-slate-200 text-sm border-b border-slate-600"
-                        >
-                          <div className="font-medium">Todos os utilizadores</div>
-                        </button>
-                        {users
-                          .filter((user) => {
+                          }
+                        }}
+                        onFocus={() => {
+                          if (transactionUserSearchQuery) {
+                            setShowTransactionUserSuggestions(true)
+                          }
+                        }}
+                        className="bg-slate-700 text-white border-slate-600"
+                      />
+                      {showTransactionUserSuggestions && transactionUserSearchQuery && (
+                        <div className="absolute z-10 w-full mt-1 bg-slate-700 border border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto hide-scrollbar">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTransactionUserFilter("all")
+                              setTransactionUserSearchQuery("")
+                              setShowTransactionUserSuggestions(false)
+                            }}
+                            className="w-full text-left px-4 py-2 hover:bg-slate-600 text-slate-200 text-sm border-b border-slate-600"
+                          >
+                            <div className="font-medium">Todos os utilizadores</div>
+                          </button>
+                          {users
+                            .filter((user) => {
+                              const query = transactionUserSearchQuery.toLowerCase()
+                              return (
+                                user.name.toLowerCase().includes(query) ||
+                                user.email.toLowerCase().includes(query)
+                              )
+                            })
+                            .slice(0, 10)
+                            .map((user) => (
+                              <button
+                                key={user.id}
+                                type="button"
+                                onClick={() => {
+                                  setTransactionUserFilter(user.id)
+                                  setTransactionUserSearchQuery(`${user.name} (${user.email})`)
+                                  setShowTransactionUserSuggestions(false)
+                                }}
+                                className="w-full text-left px-4 py-2 hover:bg-slate-600 text-slate-200 text-sm border-b border-slate-600 last:border-b-0"
+                              >
+                                <div className="font-medium">{user.name}</div>
+                                <div className="text-xs text-slate-400">{user.email}</div>
+                              </button>
+                            ))}
+                          {users.filter((user) => {
                             const query = transactionUserSearchQuery.toLowerCase()
                             return (
                               user.name.toLowerCase().includes(query) ||
                               user.email.toLowerCase().includes(query)
                             )
-                          })
-                          .slice(0, 10)
-                          .map((user) => (
-                            <button
-                              key={user.id}
-                              type="button"
-                              onClick={() => {
-                                setTransactionUserFilter(user.id)
-                                setTransactionUserSearchQuery(`${user.name} (${user.email})`)
-                                setShowTransactionUserSuggestions(false)
-                              }}
-                              className="w-full text-left px-4 py-2 hover:bg-slate-600 text-slate-200 text-sm border-b border-slate-600 last:border-b-0"
-                            >
-                              <div className="font-medium">{user.name}</div>
-                              <div className="text-xs text-slate-400">{user.email}</div>
-                            </button>
-                          ))}
-                        {users.filter((user) => {
-                          const query = transactionUserSearchQuery.toLowerCase()
-                          return (
-                            user.name.toLowerCase().includes(query) ||
-                            user.email.toLowerCase().includes(query)
-                          )
-                        }).length === 0 && (
-                          <div className="px-4 py-2 text-slate-400 text-sm">
-                            Nenhum utilizador encontrado
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {transactionUserFilter !== 'all' && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className="text-xs text-slate-400">Filtrado por:</span>
-                        <span className="px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded text-xs font-medium">
-                          {users.find(u => u.id === transactionUserFilter)?.name || 'Utilizador'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTransactionUserFilter('all')
-                            setTransactionUserSearchQuery("")
-                          }}
-                          className="text-xs text-slate-400 hover:text-slate-300 underline"
-                        >
-                          Limpar
-                        </button>
-                      </div>
-                    )}
+                          }).length === 0 && (
+                            <div className="px-4 py-2 text-slate-400 text-sm">
+                              Nenhum utilizador encontrado
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {transactionUserFilter !== 'all' && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="text-xs text-slate-400">Filtrado por:</span>
+                          <span className="px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded text-xs font-medium">
+                            {users.find(u => u.id === transactionUserFilter)?.name || 'Utilizador'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTransactionUserFilter('all')
+                              setTransactionUserSearchQuery("")
+                            }}
+                            className="text-xs text-slate-400 hover:text-slate-300 underline"
+                          >
+                            Limpar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Product Filter - Search */}
+                    <div className="relative" ref={transactionProductSearchRef}>
+                      <label className="block text-sm text-slate-300 mb-2">Filtrar por Produto</label>
+                      <Input
+                        type="text"
+                        placeholder="Pesquisar por nome do produto... (deixe vazio para todos)"
+                        value={transactionProductSearchQuery}
+                        onChange={(e) => {
+                          setTransactionProductSearchQuery(e.target.value)
+                          setShowTransactionProductSuggestions(true)
+                          if (e.target.value === "") {
+                            setTransactionProductFilter("all")
+                          }
+                        }}
+                        onFocus={() => {
+                          if (transactionProductSearchQuery) {
+                            setShowTransactionProductSuggestions(true)
+                          }
+                        }}
+                        className="bg-slate-700 text-white border-slate-600"
+                      />
+                      {showTransactionProductSuggestions && transactionProductSearchQuery && (
+                        <div className="absolute z-10 w-full mt-1 bg-slate-700 border border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto hide-scrollbar">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTransactionProductFilter("all")
+                              setTransactionProductSearchQuery("")
+                              setShowTransactionProductSuggestions(false)
+                            }}
+                            className="w-full text-left px-4 py-2 hover:bg-slate-600 text-slate-200 text-sm border-b border-slate-600"
+                          >
+                            <div className="font-medium">Todos os produtos</div>
+                          </button>
+                          {products
+                            .filter((product) => {
+                              const query = transactionProductSearchQuery.toLowerCase()
+                              return product.name.toLowerCase().includes(query)
+                            })
+                            .slice(0, 10)
+                            .map((product) => (
+                              <button
+                                key={product.id}
+                                type="button"
+                                onClick={() => {
+                                  setTransactionProductFilter(product.id)
+                                  setTransactionProductSearchQuery(product.name)
+                                  setShowTransactionProductSuggestions(false)
+                                }}
+                                className="w-full text-left px-4 py-2 hover:bg-slate-600 text-slate-200 text-sm border-b border-slate-600 last:border-b-0"
+                              >
+                                <div className="font-medium">{product.name}</div>
+                                <div className="text-xs text-slate-400">Stock: {product.stock}</div>
+                              </button>
+                            ))}
+                          {products.filter((product) => {
+                            const query = transactionProductSearchQuery.toLowerCase()
+                            return product.name.toLowerCase().includes(query)
+                          }).length === 0 && (
+                            <div className="px-4 py-2 text-slate-400 text-sm">
+                              Nenhum produto encontrado
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {transactionProductFilter !== 'all' && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="text-xs text-slate-400">Filtrado por:</span>
+                          <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs font-medium">
+                            {products.find(p => p.id === transactionProductFilter)?.name || 'Produto'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTransactionProductFilter('all')
+                              setTransactionProductSearchQuery("")
+                            }}
+                            className="text-xs text-slate-400 hover:text-slate-300 underline"
+                          >
+                            Limpar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pagination Controls for Transactions */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-slate-300 whitespace-nowrap">Itens por página:</label>
+                    <select
+                      value={transactionsItemsPerPage}
+                      onChange={(e) => setTransactionsItemsPerPage(Number.parseInt(e.target.value))}
+                      className="px-3 py-1.5 bg-slate-700 text-white border border-slate-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={30}>30</option>
+                    </select>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => setTransactionsCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={transactionsCurrentPage === 1}
+                      variant="outline"
+                      size="sm"
+                      className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 disabled:opacity-50"
+                    >
+                      Anterior
+                    </Button>
+                    <span className="text-sm text-slate-300 px-3">
+                      Página {transactionsCurrentPage} de {transactionsTotalPages || 1}
+                    </span>
+                    <Button
+                      onClick={() => setTransactionsCurrentPage(prev => Math.min(transactionsTotalPages, prev + 1))}
+                      disabled={transactionsCurrentPage >= transactionsTotalPages}
+                      variant="outline"
+                      size="sm"
+                      className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 disabled:opacity-50"
+                    >
+                      Próxima
+                    </Button>
                   </div>
                 </div>
 
@@ -1150,44 +1524,66 @@ function AdminPageContent() {
                         <th className="text-left p-2">Tipo</th>
                         <th className="text-left p-2">Usuário</th>
                         <th className="text-left p-2">Detalhes</th>
-                        <th className="text-left p-2">Valor</th>
+                        <th className="text-left p-2">Valor Anterior</th>
+                        <th className="text-left p-2">Novo Valor</th>
+                        <th className="text-left p-2">Diferença</th>
                         <th className="text-left p-2">Método</th>
                         <th className="text-left p-2">Data/Hora</th>
                         <th className="text-left p-2">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredTransactions.length === 0 ? (
+                      {paginatedTransactions.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="p-4 text-center text-slate-400">
+                          <td colSpan={9} className="p-4 text-center text-slate-400">
                             Nenhuma transação encontrada
                           </td>
                         </tr>
                       ) : (
-                        filteredTransactions.map((transaction) => (
+                        paginatedTransactions.map((transaction) => (
                           <tr key={`${transaction.type}-${transaction.id}`} className="border-b border-slate-700">
                             <td className="p-2">
                               <span className={`px-2 py-1 rounded text-xs ${
                                 transaction.type === 'order' 
                                   ? 'bg-red-600 text-white' 
-                                  : 'bg-green-600 text-white'
+                                  : transaction.type === 'deposit'
+                                  ? 'bg-green-600 text-white'
+                                  : transaction.type === 'cash_adjustment'
+                                  ? 'bg-yellow-600 text-white'
+                                  : 'bg-orange-600 text-white'
                               }`}>
-                                {transaction.type === 'order' ? 'Compra' : 'Depósito'}
+                                {transaction.type === 'order' ? 'Compra' : transaction.type === 'deposit' ? 'Depósito' : transaction.type === 'cash_adjustment' ? 'Cash' : 'Roubo'}
                               </span>
                             </td>
                             <td className="p-2">{transaction.userName}</td>
                             <td className="p-2 text-sm">
                               <div className="text-xs text-slate-400">{transaction.details}</div>
                             </td>
+                            <td className="p-2 text-slate-300">
+                              {transaction.type === 'cash_adjustment' 
+                                ? `N${transaction.previousValue.toFixed(2)}`
+                                : `N${transaction.previousValue.toFixed(2)}`
+                              }
+                            </td>
+                            <td className="p-2 font-semibold text-slate-200">
+                              {transaction.type === 'cash_adjustment' 
+                                ? `N${transaction.newValue.toFixed(2)}`
+                                : `N${transaction.newValue.toFixed(2)}`
+                              }
+                            </td>
                             <td className={`p-2 font-semibold ${
-                              transaction.amount < 0 ? 'text-red-400' : 'text-green-400'
+                              transaction.type === 'theft'
+                                ? 'text-orange-400'
+                                : transaction.type === 'cash_adjustment'
+                                ? (transaction.amount >= 0 ? 'text-yellow-400' : 'text-orange-400')
+                                : (transaction.amount < 0 ? 'text-red-400' : 'text-green-400')
                             }`}>
                               {transaction.amount < 0 ? '-' : '+'}N{Math.abs(transaction.amount).toFixed(2)}
                             </td>
                             <td className="p-2 text-sm text-slate-400">
                               {transaction.paymentMethod 
                                 ? (transaction.paymentMethod === 'balance' ? 'Saldo' : 'Dinheiro')
-                                : '-'
+                                : transaction.type === 'cash_adjustment' ? 'Ajuste' : '-'
                               }
                             </td>
                             <td className="p-2 text-sm text-slate-400">
@@ -1200,15 +1596,17 @@ function AdminPageContent() {
                               })}
                             </td>
                             <td className="p-2">
-                              <Button
-                                onClick={() => handleDeleteTransaction(transaction)}
-                                variant="outline"
-                                size="sm"
-                                className="bg-red-600 hover:bg-red-700 text-white text-xs"
-                              >
-                                <Trash2 className="w-3 h-3 mr-1" />
-                                Apagar
-                              </Button>
+                              {transaction.type !== 'cash_adjustment' && (
+                                <Button
+                                  onClick={() => handleDeleteTransaction(transaction)}
+                                  variant="outline"
+                                  size="sm"
+                                  className="bg-red-600 hover:bg-red-700 text-white text-xs"
+                                >
+                                  <Trash2 className="w-3 h-3 mr-1" />
+                                  Apagar
+                                </Button>
+                              )}
                             </td>
                           </tr>
                         ))
@@ -1220,7 +1618,7 @@ function AdminPageContent() {
                 {/* Summary */}
                 {filteredTransactions.length > 0 && (
                   <div className="mt-4 p-4 bg-slate-700 rounded-lg">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div>
                         <p className="text-xs text-slate-400 mb-1">Total de Transações</p>
                         <p className="text-lg font-bold text-white">{filteredTransactions.length}</p>
@@ -1235,6 +1633,18 @@ function AdminPageContent() {
                         <p className="text-xs text-slate-400 mb-1">Total de Compras</p>
                         <p className="text-lg font-bold text-red-400">
                           N{Math.abs(filteredTransactions.filter(t => t.type === 'order').reduce((sum, t) => sum + t.amount, 0)).toFixed(2)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 mb-1">Total de Ajustes Cash</p>
+                        <p className="text-lg font-bold text-yellow-400">
+                          N{Math.abs(filteredTransactions.filter(t => t.type === 'cash_adjustment').reduce((sum, t) => sum + t.amount, 0)).toFixed(2)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 mb-1">Total de Roubos</p>
+                        <p className="text-lg font-bold text-orange-400">
+                          N{Math.abs(filteredTransactions.filter(t => t.type === 'theft').reduce((sum, t) => sum + t.amount, 0)).toFixed(2)}
                         </p>
                       </div>
                     </div>
@@ -1496,13 +1906,51 @@ function AdminPageContent() {
                         onChange={(e) => setEditingProduct({ ...editingProduct, sellingPriceNonMember: Number.parseFloat(e.target.value) || 0 })}
                         className="bg-slate-600 text-white border-slate-500"
                       />
-                      <Input
-                        type="number"
-                        placeholder="Stock"
-                        value={editingProduct.stock}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, stock: Number.parseInt(e.target.value) || 0 })}
-                        className="bg-slate-600 text-white border-slate-500"
-                      />
+                      <div className="space-y-2">
+                        <Input
+                          type="number"
+                          placeholder="Stock"
+                          value={editingProduct.stock}
+                          onChange={(e) => {
+                            const newStock = Number.parseInt(e.target.value) || 0
+                            setEditingProduct({ ...editingProduct, stock: newStock })
+                            // Reset checkbox if stock increases back
+                            if (newStock >= editingProductOriginalStock) {
+                              setMarkAsStolen(false)
+                            }
+                          }}
+                          className="bg-slate-600 text-white border-slate-500"
+                        />
+                        {editingProduct.stock < editingProductOriginalStock && (
+                          <div className="p-3 bg-red-900/20 border border-red-600/30 rounded-lg">
+                            <div className="flex items-start gap-2">
+                              <input
+                                type="checkbox"
+                                id="markAsStolen"
+                                checked={markAsStolen}
+                                onChange={(e) => setMarkAsStolen(e.target.checked)}
+                                className="w-4 h-4 mt-0.5 text-red-600 bg-slate-600 border-slate-500 rounded focus:ring-red-500"
+                              />
+                              <div className="flex-1">
+                                <label htmlFor="markAsStolen" className="text-slate-200 text-sm font-medium cursor-pointer block">
+                                  Marcar como roubado/perdido
+                                </label>
+                                <p className="text-xs text-slate-400 mt-1">
+                                  {markAsStolen 
+                                    ? `Esta perda de ${editingProductOriginalStock - editingProduct.stock} unidades será registada como roubado/perdido no histórico.`
+                                    : `Stock diminuiu ${editingProductOriginalStock - editingProduct.stock} unidades. Marque esta opção se foi roubado/perdido.`
+                                  }
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {editingProduct.stock > editingProductOriginalStock && (
+                          <p className="text-xs text-slate-400">
+                            Stock aumentou {editingProduct.stock - editingProductOriginalStock} unidades
+                          </p>
+                        )}
+                      </div>
                       <Input
                         placeholder="URL da imagem"
                         value={editingProduct.image || ""}
@@ -1750,8 +2198,15 @@ function AdminPageContent() {
                         onChange={(e) => setAvailableCashInput(e.target.value)}
                         className="bg-slate-600 text-white border-slate-500"
                       />
+                      <Input
+                        type="text"
+                        placeholder="Motivo do ajuste (opcional)"
+                        value={availableCashReason}
+                        onChange={(e) => setAvailableCashReason(e.target.value)}
+                        className="bg-slate-600 text-white border-slate-500"
+                      />
                       <p className="text-xs text-slate-400">
-                        Este é o dinheiro disponível para comprar mais stock
+                        Este é o dinheiro disponível para comprar mais stock. O motivo será guardado no log.
                       </p>
                       <div className="flex gap-2">
                         <Button onClick={handleSaveAvailableCash} className="flex-1 bg-green-600 hover:bg-green-700">
@@ -1850,6 +2305,7 @@ function AdminPageContent() {
                     </div>
                   </div>
                 </div>
+
               </CardContent>
             </Card>
           </TabsContent>
