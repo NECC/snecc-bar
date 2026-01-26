@@ -45,6 +45,27 @@ export interface Deposit {
   timestamp: string
 }
 
+export interface AvailableCashLog {
+  id: string
+  previousAmount: number
+  newAmount: number
+  difference: number
+  reason?: string
+  timestamp: string
+  adminId?: string
+  adminName?: string
+}
+
+export interface TheftRecord {
+  id: string
+  productId: string
+  productName: string
+  quantity: number
+  timestamp: string
+  adminId?: string
+  adminName?: string
+}
+
 // Helper function to check if user is admin (based on role)
 export function isAdmin(user: User | null): boolean {
   return user?.role === 'admin'
@@ -516,16 +537,32 @@ export async function updateProduct(productId: string, updates: Partial<Product>
   }
 }
 
-export async function addProductStock(productId: string, quantity: number, type: 'add_stock' | 'correction' = 'add_stock') {
+export async function addProductStock(productId: string, quantity: number, type: 'add_stock' | 'correction' | 'theft' = 'add_stock', adminId?: string) {
   try {
+    // Get current user if adminId not provided and type is theft
+    let finalAdminId = adminId
+    if (!finalAdminId && type === 'theft') {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        finalAdminId = user.id
+      }
+    }
+
     // Create inventory movement - trigger will update stock automatically
+    const insertData: any = {
+      product_id: productId,
+      type,
+      quantity,
+    }
+
+    // Add admin_id if provided or if it's a theft
+    if (finalAdminId) {
+      insertData.admin_id = finalAdminId
+    }
+
     const { error } = await supabase
       .from('inventory_movements')
-      .insert({
-        product_id: productId,
-        type,
-        quantity,
-      })
+      .insert(insertData)
 
     if (error) {
       console.error('Error adding stock:', error)
@@ -981,10 +1018,41 @@ export async function getAvailableCash(): Promise<number> {
   }
 }
 
-export async function updateAvailableCash(amount: number): Promise<void> {
+export async function updateAvailableCash(amount: number, reason?: string, adminId?: string): Promise<void> {
   // Arredondar para 2 casas decimais antes de salvar
   const roundedAmount = Math.round(amount * 100) / 100
   try {
+    // Get current amount before updating
+    const currentAmount = await getAvailableCash()
+    const difference = Math.round((roundedAmount - currentAmount) * 100) / 100
+
+    // Only create log if there's a change
+    if (difference !== 0) {
+      // Get admin ID if not provided
+      let finalAdminId = adminId
+      if (!finalAdminId) {
+        const { data: { user } } = await supabase.auth.getUser()
+        finalAdminId = user?.id
+      }
+
+      // Create log entry
+      const { error: logError } = await supabase
+        .from('available_cash_logs')
+        .insert({
+          previous_amount: currentAmount,
+          new_amount: roundedAmount,
+          difference: difference,
+          reason: reason || 'Manual adjustment',
+          admin_id: finalAdminId,
+        })
+
+      if (logError) {
+        console.error('Error creating available cash log:', logError)
+        // Don't throw here, just log the error - we still want to update the cash
+      }
+    }
+
+    // Update available cash
     const { error } = await supabase
       .from('available_cash')
       .update({ amount: roundedAmount })
@@ -997,5 +1065,199 @@ export async function updateAvailableCash(amount: number): Promise<void> {
   } catch (error) {
     console.error('Error in updateAvailableCash:', error)
     throw error
+  }
+}
+
+export async function getAvailableCashLogs(): Promise<AvailableCashLog[]> {
+  try {
+    const { data, error } = await supabase
+      .from('available_cash_logs')
+      .select(`
+        *,
+        admin:users!available_cash_logs_admin_id_fkey(id, name)
+      `)
+      .order('timestamp', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching available cash logs:', error)
+      // Try without the join if foreign key doesn't exist yet
+      const { data: simpleData, error: simpleError } = await supabase
+        .from('available_cash_logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+      
+      if (simpleError) {
+        console.error('Error fetching available cash logs (simple):', simpleError)
+        return []
+      }
+
+      // Get admin names separately if needed
+      const adminIds = [...new Set((simpleData || []).map((log: any) => log.admin_id).filter(Boolean))]
+      const adminMap = new Map<string, string>()
+      
+      if (adminIds.length > 0) {
+        const { data: adminData } = await supabase
+          .from('users')
+          .select('id, name')
+          .in('id', adminIds)
+        
+        if (adminData) {
+          adminData.forEach((admin: any) => {
+            adminMap.set(admin.id, admin.name)
+          })
+        }
+      }
+
+      return (simpleData || []).map((log: any) => ({
+        id: log.id,
+        previousAmount: parseFloat(log.previous_amount) || 0,
+        newAmount: parseFloat(log.new_amount) || 0,
+        difference: parseFloat(log.difference) || 0,
+        reason: log.reason || null,
+        timestamp: log.timestamp,
+        adminId: log.admin_id || null,
+        adminName: log.admin_id ? (adminMap.get(log.admin_id) || 'Admin') : 'Sistema',
+      }))
+    }
+
+    return (data || []).map((log: any) => ({
+      id: log.id,
+      previousAmount: parseFloat(log.previous_amount) || 0,
+      newAmount: parseFloat(log.new_amount) || 0,
+      difference: parseFloat(log.difference) || 0,
+      reason: log.reason || null,
+      timestamp: log.timestamp,
+      adminId: log.admin_id || null,
+      adminName: log.admin?.name || (log.admin_id ? 'Admin' : 'Sistema'),
+    }))
+  } catch (error) {
+    console.error('Error in getAvailableCashLogs:', error)
+    return []
+  }
+}
+
+export async function deleteTheftRecord(theftId: string): Promise<void> {
+  try {
+    // Get theft record details first
+    const { data: theft, error: theftError } = await supabase
+      .from('inventory_movements')
+      .select('product_id, quantity')
+      .eq('id', theftId)
+      .eq('type', 'theft')
+      .single()
+
+    if (theftError || !theft) {
+      console.error('Error fetching theft record:', theftError)
+      throw new Error('Erro ao obter dados do roubo/perda')
+    }
+
+    // Restore stock by adding back the stolen quantity
+    // Since quantity is negative for theft, we need to subtract it (add the absolute value)
+    const quantityToRestore = Math.abs(theft.quantity)
+    await addProductStock(theft.product_id, quantityToRestore, 'correction')
+
+    // Delete the inventory movement
+    const { error: deleteError } = await supabase
+      .from('inventory_movements')
+      .delete()
+      .eq('id', theftId)
+
+    if (deleteError) {
+      console.error('Error deleting theft record:', deleteError)
+      throw new Error(`Erro ao apagar registro de roubo: ${deleteError.message}`)
+    }
+  } catch (error: any) {
+    console.error('Error in deleteTheftRecord:', error)
+    throw error
+  }
+}
+
+export async function getTheftRecords(): Promise<TheftRecord[]> {
+  try {
+    const { data, error } = await supabase
+      .from('inventory_movements')
+      .select(`
+        id,
+        product_id,
+        quantity,
+        timestamp,
+        admin_id,
+        products!inventory_movements_product_id_fkey(id, name),
+        users!inventory_movements_admin_id_fkey(id, name)
+      `)
+      .eq('type', 'theft')
+      .order('timestamp', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching theft records:', error)
+      // Try without the joins if foreign keys don't work
+      const { data: simpleData, error: simpleError } = await supabase
+        .from('inventory_movements')
+        .select('id, product_id, quantity, timestamp, admin_id')
+        .eq('type', 'theft')
+        .order('timestamp', { ascending: false })
+      
+      if (simpleError) {
+        console.error('Error fetching theft records (simple):', simpleError)
+        return []
+      }
+
+      // Get product names separately
+      const productIds = [...new Set((simpleData || []).map((record: any) => record.product_id).filter(Boolean))]
+      const productMap = new Map<string, string>()
+      
+      if (productIds.length > 0) {
+        const { data: productData } = await supabase
+          .from('products')
+          .select('id, name')
+          .in('id', productIds)
+        
+        if (productData) {
+          productData.forEach((product: any) => {
+            productMap.set(product.id, product.name)
+          })
+        }
+      }
+
+      // Get admin names separately
+      const adminIds = [...new Set((simpleData || []).map((record: any) => record.admin_id).filter(Boolean))]
+      const adminMap = new Map<string, string>()
+      
+      if (adminIds.length > 0) {
+        const { data: adminData } = await supabase
+          .from('users')
+          .select('id, name')
+          .in('id', adminIds)
+        
+        if (adminData) {
+          adminData.forEach((admin: any) => {
+            adminMap.set(admin.id, admin.name)
+          })
+        }
+      }
+
+      return (simpleData || []).map((record: any) => ({
+        id: record.id,
+        productId: record.product_id,
+        productName: productMap.get(record.product_id) || 'Produto desconhecido',
+        quantity: Math.abs(record.quantity) || 0, // Always positive for theft
+        timestamp: record.timestamp,
+        adminId: record.admin_id || undefined,
+        adminName: record.admin_id ? (adminMap.get(record.admin_id) || 'Admin desconhecido') : 'Sistema',
+      }))
+    }
+
+    return (data || []).map((record: any) => ({
+      id: record.id,
+      productId: record.product_id,
+      productName: record.products?.name || 'Produto desconhecido',
+      quantity: Math.abs(record.quantity) || 0, // Always positive for theft
+      timestamp: record.timestamp,
+      adminId: record.admin_id || undefined,
+      adminName: record.admin_id ? (record.users?.name || 'Admin desconhecido') : 'Sistema',
+    }))
+  } catch (error) {
+    console.error('Error in getTheftRecords:', error)
+    return []
   }
 }
