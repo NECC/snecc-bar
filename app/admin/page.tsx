@@ -19,6 +19,7 @@ type User = {
   isMember: boolean
   role?: string
   createdAt?: string
+  isVip?: boolean
 }
 
 type Product = {
@@ -30,6 +31,7 @@ type Product = {
   stock: number
   image?: string
   createdAt?: string
+  isVipOnly?: boolean
 }
 
 function AdminPageContent() {
@@ -71,13 +73,15 @@ function AdminPageContent() {
     sellingPriceNonMember: string
     stock: string
     image: string
+    isVipOnly: boolean
   }>({ 
     name: "", 
     purchasePrice: "", 
     sellingPriceMember: "", 
     sellingPriceNonMember: "", 
     stock: "", 
-    image: "" 
+    image: "",
+    isVipOnly: false,
   })
   const [isAddingProduct, setIsAddingProduct] = useState(false)
   const [userSearchQuery, setUserSearchQuery] = useState<string>("")
@@ -151,10 +155,12 @@ function AdminPageContent() {
       isMember: u.isMember,
       role: u.role,
       createdAt: u.createdAt,
+      isVip: (u as UserType).isVip ?? false,
     })))
     const ordersData = await getOrders()
     setOrders(ordersData)
-    const productsData = await getProducts()
+    const [normalProducts, vipProducts] = await Promise.all([getProducts(true), getProducts(true, true)])
+    const productsData = [...normalProducts, ...vipProducts.filter(v => !normalProducts.some(n => n.id === v.id))]
     setProducts(productsData.map(p => ({
       id: p.id,
       name: p.name,
@@ -163,6 +169,7 @@ function AdminPageContent() {
       sellingPriceNonMember: p.sellingPriceNonMember,
       stock: p.stock,
       image: p.image,
+      isVipOnly: (p as ProductType).isVipOnly ?? false,
     })))
     // Load inactive products
     const inactiveProductsData = await getInactiveProducts()
@@ -285,6 +292,7 @@ function AdminPageContent() {
         sellingPriceMember: editingProduct.sellingPriceMember,
         sellingPriceNonMember: editingProduct.sellingPriceNonMember,
         image: editingProduct.image || "",
+        isVipOnly: editingProduct.isVipOnly,
       })
 
       // Update stock if it changed
@@ -350,8 +358,9 @@ function AdminPageContent() {
         sellingPriceNonMember,
         stock,
         image: newProduct.image || "",
+        isVipOnly: newProduct.isVipOnly,
       })
-      setNewProduct({ name: "", purchasePrice: "", sellingPriceMember: "", sellingPriceNonMember: "", stock: "", image: "" })
+      setNewProduct({ name: "", purchasePrice: "", sellingPriceMember: "", sellingPriceNonMember: "", stock: "", image: "", isVipOnly: false })
       setIsAddingProduct(false)
       loadData()
     } catch (error) {
@@ -420,7 +429,7 @@ function AdminPageContent() {
     setEditingProductOriginalStock(0)
     setMarkAsStolen(false)
     setIsAddingProduct(false)
-    setNewProduct({ name: "", purchasePrice: "", sellingPriceMember: "", sellingPriceNonMember: "", stock: "", image: "" })
+    setNewProduct({ name: "", purchasePrice: "", sellingPriceMember: "", sellingPriceNonMember: "", stock: "", image: "", isVipOnly: false })
   }
 
 
@@ -655,6 +664,7 @@ function AdminPageContent() {
         balance: balanceDifference !== 0 ? undefined : editingUser.balance,
         isMember: editingUser.isMember,
         role: editingUser.role as 'admin' | 'user' | undefined,
+        isVip: editingUser.isVip,
       })
       
       setEditingUser(null)
@@ -1062,6 +1072,16 @@ function AdminPageContent() {
                             className="w-4 h-4"
                           />
                           <label htmlFor="isMember" className="text-slate-200 text-sm">Membro NECC</label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="isVip"
+                            checked={editingUser.isVip ?? false}
+                            onChange={(e) => setEditingUser({ ...editingUser, isVip: e.target.checked })}
+                            className="w-4 h-4 accent-amber-500"
+                          />
+                          <label htmlFor="isVip" className="text-slate-200 text-sm">VIP (pode entrar em dívida e ver produtos black market)</label>
                         </div>
                         <select
                           value={editingUser.role || 'user'}
@@ -1859,6 +1879,16 @@ function AdminPageContent() {
                         onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })}
                         className="bg-slate-600 text-white border-slate-500"
                       />
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="newProductVipOnly"
+                          checked={newProduct.isVipOnly}
+                          onChange={(e) => setNewProduct({ ...newProduct, isVipOnly: e.target.checked })}
+                          className="w-4 h-4 accent-amber-500"
+                        />
+                        <label htmlFor="newProductVipOnly" className="text-slate-200 text-sm">Apenas VIP (black market)</label>
+                      </div>
                       <div className="flex gap-2">
                         <Button onClick={handleAddProduct} className="flex-1 bg-green-600 hover:bg-green-700">
                           Adicionar
@@ -1906,6 +1936,16 @@ function AdminPageContent() {
                         onChange={(e) => setEditingProduct({ ...editingProduct, sellingPriceNonMember: Number.parseFloat(e.target.value) || 0 })}
                         className="bg-slate-600 text-white border-slate-500"
                       />
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="editProductVipOnly"
+                          checked={editingProduct.isVipOnly ?? false}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, isVipOnly: e.target.checked })}
+                          className="w-4 h-4 accent-amber-500"
+                        />
+                        <label htmlFor="editProductVipOnly" className="text-slate-200 text-sm">Apenas VIP (black market)</label>
+                      </div>
                       <div className="space-y-2">
                         <Input
                           type="number"

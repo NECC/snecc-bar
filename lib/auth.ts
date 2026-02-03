@@ -8,6 +8,12 @@ export interface User {
   isMember: boolean
   role: 'admin' | 'user'
   createdAt: string
+  /** Secret VIP: can go into debt (up to 10€) and see VIP-only products */
+  isVip?: boolean
+  /** When user first went into debt (for 30-day freeze) */
+  debtStartedAt?: string | null
+  /** Largest absolute debt ever (for lifetime ranking) */
+  maxDebtEver?: number
 }
 
 export interface Order {
@@ -35,6 +41,8 @@ export interface Product {
   sellingPriceMember: number
   sellingPriceNonMember: number
   isActive?: boolean
+  /** Only VIP users can see and buy */
+  isVipOnly?: boolean
 }
 
 export interface Deposit {
@@ -66,9 +74,35 @@ export interface TheftRecord {
   adminName?: string
 }
 
+export interface CaloteiroEntry {
+  id: string
+  name: string
+  balance: number
+  maxDebtEver: number
+  debtStartedAt: string | null
+}
+
 // Helper function to check if user is admin (based on role)
 export function isAdmin(user: User | null): boolean {
   return user?.role === 'admin'
+}
+
+/** Max allowed debt for VIP users (euros) */
+export const VIP_MAX_DEBT = 10
+
+/** Max days a VIP can stay in debt before account is frozen */
+export const VIP_MAX_DEBT_DAYS = 30
+
+/** Check if a VIP account is frozen (over 10€ debt or over 30 days in debt) */
+export function isAccountFrozen(user: User | null): boolean {
+  if (!user) return false
+  const balance = user.balance ?? 0
+  if (balance < -VIP_MAX_DEBT) return true
+  if (!user.debtStartedAt || balance >= 0) return false
+  const started = new Date(user.debtStartedAt).getTime()
+  const now = Date.now()
+  const days = (now - started) / (1000 * 60 * 60 * 24)
+  return days > VIP_MAX_DEBT_DAYS
 }
 
 
@@ -105,6 +139,9 @@ export async function getCurrentUser(): Promise<User | null> {
     isMember: data.is_member || false,
     role: data.role || 'user',
     createdAt: data.created_at,
+    isVip: data.is_vip ?? false,
+    debtStartedAt: data.debt_started_at ?? null,
+    maxDebtEver: parseFloat(data.max_debt_ever) || 0,
   }
 }
 
@@ -206,7 +243,7 @@ export async function getUsers(): Promise<User[]> {
     console.error('Get users error:', error)
     return []
   }
-  return (data || []).map(user => ({
+  return (data || []).map((user: any) => ({
     id: user.id,
     email: user.email,
     name: user.name,
@@ -214,6 +251,9 @@ export async function getUsers(): Promise<User[]> {
     isMember: user.is_member || false,
     role: user.role || 'user',
     createdAt: user.created_at,
+    isVip: user.is_vip ?? false,
+    debtStartedAt: user.debt_started_at ?? null,
+    maxDebtEver: parseFloat(user.max_debt_ever) || 0,
   }))
 }
 
@@ -250,6 +290,7 @@ export async function updateUser(userId: string, updates: {
   balance?: number
   isMember?: boolean
   role?: 'admin' | 'user'
+  isVip?: boolean
 }) {
   const updateData: any = {}
   
@@ -258,6 +299,7 @@ export async function updateUser(userId: string, updates: {
   if (updates.balance !== undefined) updateData.balance = updates.balance
   if (updates.isMember !== undefined) updateData.is_member = updates.isMember
   if (updates.role !== undefined) updateData.role = updates.role
+  if (updates.isVip !== undefined) updateData.is_vip = updates.isVip
 
   const { error } = await supabase
     .from('users')
@@ -330,10 +372,10 @@ export async function addOrder(
   paymentMethod: 'balance' | 'cash'
 ) {
   try {
-    // Get user data to check member status and balance
+    // Get user data to check member status, balance, and VIP/debt state
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('balance, is_member')
+      .select('balance, is_member, is_vip, debt_started_at')
       .eq('id', userId)
       .single()
 
@@ -343,13 +385,15 @@ export async function addOrder(
     }
 
     const isMember = userData.is_member || false
+    const isVip = userData.is_vip === true
     const userBalance = parseFloat(userData.balance) || 0
+    const debtStartedAt = userData.debt_started_at
 
-    // Get products to determine prices based on member status
+    // Get products to determine prices and VIP-only flag
     const productIds = items.map(item => item.productId)
     const { data: productsData, error: productsError } = await supabase
       .from('products')
-      .select('id, purchase_price, selling_price_member, selling_price_non_member, stock')
+      .select('id, purchase_price, selling_price_member, selling_price_non_member, stock, is_vip_only')
       .in('id', productIds)
 
     if (productsError || !productsData) {
@@ -368,6 +412,11 @@ export async function addOrder(
       const product = productMap.get(item.productId)
       if (!product) {
         throw new Error(`Produto não encontrado: ${item.productId}`)
+      }
+
+      // VIP-only products: only VIP users can buy
+      if (product.is_vip_only && !isVip) {
+        throw new Error('Apenas utilizadores VIP podem comprar este produto.')
       }
 
       // Check stock
@@ -395,10 +444,25 @@ export async function addOrder(
     // Arredondar total final para garantir precisão
     total = Math.round(total * 100) / 100
 
-    // If payment is by balance, verify user has enough balance
+    // If payment is by balance, verify balance or VIP debt rules
     if (paymentMethod === 'balance') {
-      if (userBalance < total) {
-        throw new Error(`Saldo insuficiente! Total: N${total.toFixed(2)}, Saldo disponível: N${userBalance.toFixed(2)}`)
+      const newBalance = Math.round((userBalance - total) * 100) / 100
+
+      if (isVip) {
+        // VIP: can go into debt up to VIP_MAX_DEBT; check freeze
+        const frozen =
+          userBalance < -VIP_MAX_DEBT ||
+          (debtStartedAt && (Date.now() - new Date(debtStartedAt).getTime()) / (1000 * 60 * 60 * 24) > VIP_MAX_DEBT_DAYS)
+        if (frozen) {
+          throw new Error('Conta suspensa. Paga a dívida para voltar a comprar.')
+        }
+        if (newBalance < -VIP_MAX_DEBT) {
+          throw new Error(`Dívida máxima permitida é N${VIP_MAX_DEBT}. Total: N${total.toFixed(2)}, saldo: N${userBalance.toFixed(2)}.`)
+        }
+      } else {
+        if (userBalance < total) {
+          throw new Error(`Saldo insuficiente! Total: N${total.toFixed(2)}, Saldo disponível: N${userBalance.toFixed(2)}`)
+        }
       }
     }
 
@@ -474,18 +538,20 @@ export async function addOrder(
   }
 }
 
-export async function getProducts(includeInactive: boolean = false): Promise<Product[]> {
+export async function getProducts(includeInactive: boolean = false, vipOnly: boolean = false): Promise<Product[]> {
   try {
     let query = supabase
       .from('products')
       .select('*')
 
-    // Filter out inactive products by default (unless explicitly requested)
-    // If is_active column doesn't exist, this will still work (null/undefined = active)
     if (!includeInactive) {
-      // Filter to show only active products (is_active = true or null)
-      // Using .or() with proper Supabase syntax
       query = query.or('is_active.is.null,is_active.eq.true')
+    }
+
+    if (vipOnly) {
+      query = query.eq('is_vip_only', true)
+    } else {
+      query = query.or('is_vip_only.is.null,is_vip_only.eq.false')
     }
 
     query = query.order('created_at', { ascending: false })
@@ -505,7 +571,8 @@ export async function getProducts(includeInactive: boolean = false): Promise<Pro
       purchasePrice: parseFloat(p.purchase_price) || 0,
       sellingPriceMember: parseFloat(p.selling_price_member) || 0,
       sellingPriceNonMember: parseFloat(p.selling_price_non_member) || 0,
-      isActive: p.is_active !== false, // Default to true if null/undefined
+      isActive: p.is_active !== false,
+      isVipOnly: p.is_vip_only === true,
     }))
   } catch (error) {
     console.error('Error in getProducts:', error)
@@ -521,6 +588,7 @@ export async function updateProduct(productId: string, updates: Partial<Product>
     if (updates.purchasePrice !== undefined) updateData.purchase_price = updates.purchasePrice
     if (updates.sellingPriceMember !== undefined) updateData.selling_price_member = updates.sellingPriceMember
     if (updates.sellingPriceNonMember !== undefined) updateData.selling_price_non_member = updates.sellingPriceNonMember
+    if (updates.isVipOnly !== undefined) updateData.is_vip_only = updates.isVipOnly
 
     const { error } = await supabase
       .from('products')
@@ -585,6 +653,7 @@ export async function addProduct(product: Omit<Product, 'id'>) {
         purchase_price: product.purchasePrice,
         selling_price_member: product.sellingPriceMember,
         selling_price_non_member: product.sellingPriceNonMember,
+        is_vip_only: product.isVipOnly ?? false,
       })
       .select()
       .single()
@@ -703,6 +772,7 @@ export async function getInactiveProducts(): Promise<Product[]> {
       sellingPriceMember: parseFloat(p.selling_price_member) || 0,
       sellingPriceNonMember: parseFloat(p.selling_price_non_member) || 0,
       isActive: p.is_active !== false,
+      isVipOnly: p.is_vip_only === true,
     }))
   } catch (error) {
     console.error('Error in getInactiveProducts:', error)
@@ -1259,5 +1329,37 @@ export async function getTheftRecords(): Promise<TheftRecord[]> {
   } catch (error) {
     console.error('Error in getTheftRecords:', error)
     return []
+  }
+}
+
+/** Public leaderboard: biggest debtors by current debt and by lifetime debt */
+export async function getCaloteiros(): Promise<{
+  byCurrentDebt: CaloteiroEntry[]
+  byLifetimeDebt: CaloteiroEntry[]
+}> {
+  try {
+    const { data, error } = await supabase.rpc('get_caloteiros_leaderboard')
+
+    if (error) {
+      console.error('Error fetching caloteiros:', error)
+      return { byCurrentDebt: [], byLifetimeDebt: [] }
+    }
+
+    const mapRow = (row: any): CaloteiroEntry => ({
+      id: row.id,
+      name: row.name || 'Anónimo',
+      balance: parseFloat(row.balance) || 0,
+      maxDebtEver: parseFloat(row.max_debt_ever) || 0,
+      debtStartedAt: row.debt_started_at ?? null,
+    })
+
+    const list = (data || []).map(mapRow)
+    const byCurrentDebt = [...list].sort((a, b) => a.balance - b.balance) // most negative first
+    const byLifetimeDebt = [...list].sort((a, b) => b.maxDebtEver - a.maxDebtEver) // highest max debt first
+
+    return { byCurrentDebt, byLifetimeDebt }
+  } catch (error) {
+    console.error('Error in getCaloteiros:', error)
+    return { byCurrentDebt: [], byLifetimeDebt: [] }
   }
 }

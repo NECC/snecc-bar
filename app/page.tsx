@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -17,6 +18,7 @@ import {
   getProducts,
   getOrders,
   getDeposits,
+  isAccountFrozen,
   type User as UserType,
   type Product as ProductType,
   type Order,
@@ -59,6 +61,7 @@ function VendingMachineContent() {
   const [isCashPayment, setIsCashPayment] = useState(false)
   const [animatingProducts, setAnimatingProducts] = useState<AnimatingProduct[]>([])
   const [dynamicProducts, setDynamicProducts] = useState<DynamicProduct[]>([])
+  const [vipProducts, setVipProducts] = useState<DynamicProduct[]>([])
   const [userOrders, setUserOrders] = useState<Order[]>([])
   const [userDeposits, setUserDeposits] = useState<Deposit[]>([])
   const [clickingProducts, setClickingProducts] = useState<Set<string>>(new Set())
@@ -82,21 +85,17 @@ function VendingMachineContent() {
   }, [])
 
   useEffect(() => {
-    // Load products from Supabase and adjust prices based on membership
+    // Load normal products; VIP users also get VIP-only products
     const loadProducts = async () => {
+      const isMember = currentUser?.isMember ?? true
+
       const storedProducts = await getProducts()
       if (storedProducts.length > 0) {
-        // Use member status from current user, or default to member prices
-        const isMember = currentUser?.isMember ?? true
-
         setDynamicProducts(storedProducts.map(p => {
-          // Use image from database, ensure proper path format
           let imagePath = p.image || ''
-          // Ensure path starts with / if it's a local path (not a URL)
           if (imagePath && !imagePath.startsWith('http') && !imagePath.startsWith('/')) {
             imagePath = '/' + imagePath
           }
-          
           return {
             id: p.id,
             name: p.name,
@@ -108,6 +107,34 @@ function VendingMachineContent() {
             sellingPriceNonMember: p.sellingPriceNonMember,
           }
         }))
+      } else {
+        setDynamicProducts([])
+      }
+
+      if (currentUser?.isVip) {
+        const vipOnlyProducts = await getProducts(false, true)
+        if (vipOnlyProducts.length > 0) {
+          setVipProducts(vipOnlyProducts.map(p => {
+            let imagePath = p.image || ''
+            if (imagePath && !imagePath.startsWith('http') && !imagePath.startsWith('/')) {
+              imagePath = '/' + imagePath
+            }
+            return {
+              id: p.id,
+              name: p.name,
+              image: imagePath || '/placeholder.svg',
+              price: isMember ? p.sellingPriceMember : p.sellingPriceNonMember,
+              stock: p.stock,
+              purchasePrice: p.purchasePrice,
+              sellingPriceMember: p.sellingPriceMember,
+              sellingPriceNonMember: p.sellingPriceNonMember,
+            }
+          }))
+        } else {
+          setVipProducts([])
+        }
+      } else {
+        setVipProducts([])
       }
     }
     loadProducts()
@@ -237,9 +264,9 @@ function VendingMachineContent() {
   }
 
   const handleCheckout = async () => {
-    // Validate stock before proceeding to checkout
+    const allProducts = [...dynamicProducts, ...vipProducts]
     for (const item of cart) {
-      const product = dynamicProducts.find(p => p.id === item.product.id)
+      const product = allProducts.find(p => p.id === item.product.id)
       if (!product || item.quantity > product.stock) {
         await showAlert({
           message: `Stock insuficiente para ${item.product.name}. Disponível: ${product?.stock || 0}`,
@@ -274,6 +301,14 @@ function VendingMachineContent() {
       return
     }
 
+    if (!isCashPayment && isAccountFrozen(currentUser)) {
+      await showAlert({
+        message: "Conta suspensa. Paga a dívida para voltar a comprar.",
+        type: 'error'
+      })
+      return
+    }
+
     setIsProcessingPurchase(true)
 
     try {
@@ -298,14 +333,13 @@ function VendingMachineContent() {
       }
 
       // Reload products to update stock
-      const storedProducts = await getProducts()
       const isMember = updatedUser?.isMember ?? currentUser?.isMember ?? true
+      const storedProducts = await getProducts()
       setDynamicProducts(storedProducts.map(p => {
         let imagePath = p.image || ''
         if (imagePath && !imagePath.startsWith('http') && !imagePath.startsWith('/')) {
           imagePath = '/' + imagePath
         }
-        
         return {
           id: p.id,
           name: p.name,
@@ -317,6 +351,27 @@ function VendingMachineContent() {
           sellingPriceNonMember: p.sellingPriceNonMember,
         }
       }))
+      if (updatedUser?.isVip) {
+        const vipOnlyProducts = await getProducts(false, true)
+        setVipProducts(vipOnlyProducts.map(p => {
+          let imagePath = p.image || ''
+          if (imagePath && !imagePath.startsWith('http') && !imagePath.startsWith('/')) {
+            imagePath = '/' + imagePath
+          }
+          return {
+            id: p.id,
+            name: p.name,
+            image: imagePath || '/placeholder.svg',
+            price: isMember ? p.sellingPriceMember : p.sellingPriceNonMember,
+            stock: p.stock,
+            purchasePrice: p.purchasePrice,
+            sellingPriceMember: p.sellingPriceMember,
+            sellingPriceNonMember: p.sellingPriceNonMember,
+          }
+        }))
+      } else {
+        setVipProducts([])
+      }
 
       setCart([])
       setIsCheckoutPageOpen(false)
@@ -363,6 +418,12 @@ function VendingMachineContent() {
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500 hidden sm:block">Máquina de venda automática</p>
               </div>
+              <Link
+                href="/caloteiros"
+                className="text-sm font-medium text-amber-600 hover:text-amber-700 hidden sm:inline"
+              >
+                Caloteiros
+              </Link>
             </div>
             
             <div className="flex items-center gap-3">
@@ -402,7 +463,7 @@ function VendingMachineContent() {
               <p className="text-sm text-slate-500">Clique para adicionar ao carrinho</p>
             </div>
             
-            {dynamicProducts.length === 0 ? (
+            {dynamicProducts.length === 0 && (!currentUser?.isVip || vipProducts.length === 0) ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center py-16">
                   <ShoppingCart className="w-16 h-16 text-slate-300 mx-auto mb-4" />
@@ -410,8 +471,10 @@ function VendingMachineContent() {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3 sm:gap-4 lg:gap-6 content-start">
-                {dynamicProducts.map((product) => (
+              <div className="flex-1 flex flex-col gap-8">
+                {dynamicProducts.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3 sm:gap-4 lg:gap-6 content-start">
+                    {dynamicProducts.map((product) => (
                   <div
                     key={product.id}
                     className="group relative"
@@ -474,7 +537,73 @@ function VendingMachineContent() {
                       </div>
                     </button>
                   </div>
-                ))}
+                    ))}
+                  </div>
+                )}
+                {currentUser?.isVip && vipProducts.length > 0 && (
+                  <>
+                    <h3 className="text-base sm:text-lg font-bold text-slate-800 border-b border-amber-200 pb-2 flex items-center gap-2">
+                      <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-sm">VIP</span>
+                      Black market
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3 sm:gap-4 lg:gap-6 content-start">
+                      {vipProducts.map((product) => (
+                        <div key={product.id} className="group relative">
+                          <button
+                            onClick={(e) => handleProductClick(product, e)}
+                            disabled={product.stock <= 0}
+                            className={`w-full relative bg-amber-50/50 rounded-xl border-2 transition-all duration-300 overflow-hidden ${
+                              product.stock <= 0
+                                ? 'border-amber-200 opacity-50 cursor-not-allowed'
+                                : 'border-amber-200 hover:border-amber-400 hover:shadow-xl hover:-translate-y-1 active:scale-95'
+                            }`}
+                          >
+                            {product.stock > 0 && product.stock < 5 && (
+                              <div className="absolute top-2 right-2 z-10 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-md">
+                                {product.stock} restantes
+                              </div>
+                            )}
+                            {product.stock <= 0 && (
+                              <div className="absolute inset-0 bg-slate-100/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
+                                <XCircle className="w-10 h-10 text-red-500 mb-2" />
+                                <span className="text-xs font-semibold text-red-600">Sem Stock</span>
+                              </div>
+                            )}
+                            <div className="aspect-square p-4 sm:p-6 flex items-center justify-center bg-gradient-to-br from-amber-50 to-white">
+                              <img
+                                src={product.image || "/placeholder.svg"}
+                                alt={product.name}
+                                className="max-w-full max-h-full object-contain transition-transform duration-300 group-hover:scale-110"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  if (!target.dataset.fallbackAttempted && !target.src.includes('placeholder.svg') && !target.src.includes('data:image')) {
+                                    target.dataset.fallbackAttempted = 'true'
+                                    target.src = '/placeholder.svg'
+                                  } else if (!target.src.includes('data:image')) {
+                                    target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2U1ZTdlYiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTYiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div className="p-3 sm:p-4 border-t border-amber-100">
+                              <h3 className="text-xs sm:text-sm font-semibold text-slate-900 mb-2 line-clamp-2 min-h-[2.5rem]">
+                                {product.name}
+                              </h3>
+                              <div className="flex items-center justify-between">
+                                <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-amber-600 to-amber-700 bg-clip-text text-transparent">
+                                  N{product.price.toFixed(2)}
+                                </span>
+                                {product.stock > 0 && (
+                                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
