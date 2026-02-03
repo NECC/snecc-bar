@@ -334,6 +334,6 @@ For issues or questions, please contact the NECC development team.
 
 <div align="center">
 
-**Built with ❤️ for NECC - University of Minho**
+**Built with 💙 by NECC - Universidade do Minho**
 
 </div>
