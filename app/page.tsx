@@ -8,7 +8,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { User, X, ShoppingCart, Trash2, XCircle, History, TrendingUp, Calendar } from "lucide-react"
+import { User, X, ShoppingCart, Trash2, XCircle, History, TrendingUp, Calendar, AlertTriangle, Clock } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 
 import {
@@ -19,6 +19,7 @@ import {
   getOrders,
   getDeposits,
   isAccountFrozen,
+  VIP_MAX_DEBT_DAYS,
   type User as UserType,
   type Product as ProductType,
   type Order,
@@ -404,6 +405,18 @@ function VendingMachineContent() {
     return cart.reduce((total, item) => total + item.quantity, 0)
   }
 
+  // Dias restantes para pagar dívida (só quando balance < 0 e tem debtStartedAt)
+  const getDebtDaysRemaining = (): number | null => {
+    if (!currentUser || currentUser.balance >= 0 || !currentUser.debtStartedAt) return null
+    const started = new Date(currentUser.debtStartedAt).getTime()
+    const now = Date.now()
+    const daysElapsed = (now - started) / (1000 * 60 * 60 * 24)
+    return Math.max(0, Math.ceil(VIP_MAX_DEBT_DAYS - daysElapsed))
+  }
+
+  const debtDaysRemaining = getDebtDaysRemaining()
+  const isInDebt = currentUser != null && currentUser.balance < 0
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-cyan-50 flex flex-col">
       {/* Header Fixo */}
@@ -453,6 +466,28 @@ function VendingMachineContent() {
           </div>
         </div>
       </header>
+
+      {/* Aviso de dívida: caloteiro + tempo para pagar */}
+      {isInDebt && (
+        <div className={`px-4 sm:px-6 lg:px-8 py-3 max-w-[1920px] mx-auto w-full ${isAccountFrozen(currentUser) ? 'bg-red-100 border-b border-red-200' : 'bg-amber-50 border-b border-amber-200'}`}>
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
+            <span className="flex items-center gap-2 font-semibold text-slate-800">
+              <AlertTriangle className={`w-4 h-4 shrink-0 ${isAccountFrozen(currentUser) ? 'text-red-600' : 'text-amber-600'}`} />
+              Estás em dívida: <span className="text-red-600 font-bold">N{Math.abs(currentUser?.balance ?? 0).toFixed(2)}</span>
+            </span>
+            {isAccountFrozen(currentUser) ? (
+              <span className="flex items-center gap-1.5 text-red-700 font-medium">
+                Conta suspensa. Paga a dívida para voltar a comprar.
+              </span>
+            ) : debtDaysRemaining !== null ? (
+              <span className="flex items-center gap-1.5 text-amber-800">
+                <Clock className="w-4 h-4 shrink-0" />
+                <strong>{debtDaysRemaining}</strong> {debtDaysRemaining === 1 ? 'dia' : 'dias'} para pagar antes da suspensão
+              </span>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {/* Layout Principal - Produtos ocupam todo o espaço */}
       <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1920px] mx-auto w-full flex flex-col">
@@ -654,9 +689,24 @@ function VendingMachineContent() {
                 {currentUser?.email && (
                   <p className="text-slate-600 text-sm">{currentUser.email}</p>
                 )}
-                <p className="text-cyan-600 font-bold mt-2 text-lg">
+                <p className={`font-bold mt-2 text-lg ${(currentUser?.balance ?? 0) < 0 ? 'text-red-600' : 'text-cyan-600'}`}>
                   N{currentUser?.balance !== undefined ? currentUser.balance.toFixed(2) : "0.00"}
                 </p>
+                {isInDebt && (
+                  <div className={`mt-2 px-3 py-2 rounded-lg text-sm ${isAccountFrozen(currentUser) ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-amber-100 text-amber-800 border border-amber-200'}`}>
+                    <span className="flex items-center gap-2 font-medium">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      {isAccountFrozen(currentUser)
+                        ? 'Conta suspensa. Paga a dívida para voltar a comprar.'
+                        : debtDaysRemaining !== null && (
+                            <>
+                              <Clock className="w-4 h-4 shrink-0" />
+                              {debtDaysRemaining} {debtDaysRemaining === 1 ? 'dia' : 'dias'} para pagar antes da suspensão
+                            </>
+                          )}
+                    </span>
+                  </div>
+                )}
                 {currentUser && (
                   <div className="mt-3 flex items-center gap-2 flex-wrap">
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${currentUser.isMember ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-slate-100 text-slate-700 border border-slate-200'}`}>
