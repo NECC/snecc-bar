@@ -8,7 +8,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { User, X, ShoppingCart, Trash2, XCircle, History, TrendingUp, Calendar, AlertTriangle, Clock } from "lucide-react"
+import { User, X, ShoppingCart, Trash2, XCircle, History, TrendingUp, Calendar, AlertTriangle, Clock, Trophy } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 
 import {
@@ -431,15 +431,19 @@ function VendingMachineContent() {
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500 hidden sm:block">Máquina de venda automática</p>
               </div>
-              <Link
-                href="/caloteiros"
-                className="text-sm font-medium text-amber-600 hover:text-amber-700 hidden sm:inline"
-              >
-                Caloteiros
-              </Link>
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 hover:bg-slate-100 text-slate-600 hover:text-slate-900"
+                asChild
+              >
+                <Link href="/caloteiros" title="Ranking de caloteiros">
+                  <Trophy className="w-5 h-5" />
+                </Link>
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
