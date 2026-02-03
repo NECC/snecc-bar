@@ -8,9 +8,14 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'SNecc Bar',
+  title: 'sNECC Bar',
   description: 'Created with v0',
   generator: 'v0.app',
+  icons: {
+    icon: '/favicon.ico',
+    // iOS "Add to Home Screen": usa apple-touch-icon (PNG 180x180). Se não existir, o Safari mostra a 1.ª letra do título ("S").
+    apple: '/apple-touch-icon.png',
+  },
 }
 
 export default function RootLayout({
@@ -19,10 +24,10 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="pt">
       <head>
-        <title>sNECC Bar</title>
-        <link rel="icon" href="/favicon.ico" />
+        {/* iOS Add to Home Screen: ícone que aparece no ecrã inicial (evita mostrar "S") */}
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
       </head>
       <body className={`font-sans antialiased`}>
         {children}
