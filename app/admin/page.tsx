@@ -159,7 +159,7 @@ function AdminPageContent() {
     })))
     const ordersData = await getOrders()
     setOrders(ordersData)
-    const [normalProducts, vipProducts] = await Promise.all([getProducts(true), getProducts(true, true)])
+    const [normalProducts, vipProducts] = await Promise.all([getProducts(false), getProducts(false, true)])
     const productsData = [...normalProducts, ...vipProducts.filter(v => !normalProducts.some(n => n.id === v.id))]
     setProducts(productsData.map(p => ({
       id: p.id,
