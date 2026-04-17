@@ -457,16 +457,6 @@ function VendingMachineContent() {
             </div>
             
             <div className="flex items-center gap-1 sm:gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 hover:bg-slate-100 text-slate-600 hover:text-slate-900"
-                asChild
-              >
-                <Link href="/caloteiros" title="Ranking de caloteiros">
-                  <Trophy className="w-5 h-5" />
-                </Link>
-              </Button>
               {currentUser ? (
                 <button
                   type="button"
@@ -511,6 +501,16 @@ function VendingMachineContent() {
                   <User className="w-5 h-5" />
                 </Button>
               )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 hover:bg-slate-100 text-slate-600 hover:text-slate-900"
+                asChild
+              >
+                <Link href="/caloteiros" title="Ranking de caloteiros">
+                  <Trophy className="w-5 h-5" />
+                </Link>
+              </Button>
               <Button
                 ref={cartButtonRef}
                 variant="ghost"
