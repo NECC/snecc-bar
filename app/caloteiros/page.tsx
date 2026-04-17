@@ -2,25 +2,40 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { getCaloteiros, type CaloteiroEntry } from "@/lib/auth"
+import { getCaloteiros, getMonstersSold, type CaloteiroEntry } from "@/lib/auth"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Trophy, TrendingDown, History, ArrowLeft, User, X, Clock } from "lucide-react"
+import { Trophy, TrendingDown, History, ArrowLeft, User, X, Clock, Zap } from "lucide-react"
 
 export default function CaloteirosPage() {
   const [byCurrentDebt, setByCurrentDebt] = useState<CaloteiroEntry[]>([])
   const [byLifetimeDebt, setByLifetimeDebt] = useState<CaloteiroEntry[]>([])
+  const [monsterStats, setMonsterStats] = useState<{ total: number; firstSold: string | null } | null>(null)
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<CaloteiroEntry | null>(null)
 
   useEffect(() => {
     const load = async () => {
-      const { byCurrentDebt: current, byLifetimeDebt: lifetime } = await getCaloteiros()
-      setByCurrentDebt(current)
-      setByLifetimeDebt(lifetime)
+      const [caloteiros, monsters] = await Promise.all([
+        getCaloteiros(),
+        getMonstersSold(),
+      ])
+      setByCurrentDebt(caloteiros.byCurrentDebt)
+      setByLifetimeDebt(caloteiros.byLifetimeDebt)
+      setMonsterStats(monsters)
       setLoading(false)
     }
     load()
   }, [])
+
+  const monstersSinceDays = monsterStats?.firstSold
+    ? Math.max(1, Math.floor((Date.now() - new Date(monsterStats.firstSold).getTime()) / 86400000))
+    : null
+  const monstersSinceLabel = monsterStats?.firstSold
+    ? new Date(monsterStats.firstSold).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' })
+    : null
+  const monstersPerDay = monsterStats && monstersSinceDays
+    ? monsterStats.total / monstersSinceDays
+    : null
 
   const formatDebt = (balance: number) =>
     balance < 0 ? `N${Math.abs(balance).toFixed(2)}` : "—"
@@ -57,7 +72,25 @@ export default function CaloteirosPage() {
         </div>
       </header>
 
-      <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1920px] mx-auto w-full flex flex-col">
+      <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1920px] mx-auto w-full flex flex-col gap-4 sm:gap-6">
+        {monsterStats && monsterStats.total > 0 && (
+          <div className="flex items-center justify-center gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-lime-50 to-emerald-50 px-4 py-3 shadow-sm">
+            <span className="flex items-center justify-center w-9 h-9 rounded-full bg-emerald-500/10 text-emerald-700 shrink-0">
+              <Zap className="w-5 h-5" />
+            </span>
+            <div className="text-sm sm:text-base text-slate-700 text-center">
+              <span className="font-bold tabular-nums text-emerald-700">{monsterStats.total.toLocaleString('pt-PT')}</span>
+              {" "}Monsters vendidas
+              {monstersSinceLabel && (
+                <span className="block sm:inline text-xs sm:text-sm text-slate-500 sm:ml-1">
+                  desde {monstersSinceLabel}
+                  {monstersSinceDays !== null && <> · <span className="font-semibold text-slate-600 tabular-nums">{monstersSinceDays}</span> {monstersSinceDays === 1 ? 'dia' : 'dias'}</>}
+                  {monstersPerDay !== null && <> · <span className="font-semibold text-slate-600 tabular-nums">{monstersPerDay.toFixed(1)}</span>/dia</>}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
         <main className="flex-1 flex flex-col">
           <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-4 sm:p-6 lg:p-8 flex-1 flex flex-col">
             <div className="mb-4 sm:mb-6">

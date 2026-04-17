@@ -99,7 +99,7 @@ export function isAdmin(user: User | null): boolean {
 export const VIP_MAX_DEBT = 10
 
 /** Max days a VIP can stay in debt before account is frozen */
-export const VIP_MAX_DEBT_DAYS = 5
+export const VIP_MAX_DEBT_DAYS = 7
 
 /** Fine (euros) applied once when the grace period expires */
 export const DEBT_OVERDUE_FINE = 2
@@ -1432,6 +1432,20 @@ export async function getTheftRecords(): Promise<TheftRecord[]> {
   } catch (error) {
     console.error('Error in getTheftRecords:', error)
     return []
+  }
+}
+
+/** Public counter: total Monsters sold + date of first sale */
+export async function getMonstersSold(): Promise<{ total: number; firstSold: string | null }> {
+  const { data, error } = await supabase.rpc('get_monsters_sold')
+  if (error) {
+    console.error('Error fetching monsters sold:', error)
+    return { total: 0, firstSold: null }
+  }
+  const row = Array.isArray(data) ? data[0] : data
+  return {
+    total: Number(row?.total) || 0,
+    firstSold: row?.first_sold ?? null,
   }
 }
 
