@@ -8,8 +8,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { User, X, ShoppingCart, Trash2, XCircle, History, TrendingUp, Calendar, AlertTriangle, Clock, Trophy } from "lucide-react"
-import { Checkbox } from "@/components/ui/checkbox"
+import { User, X, ShoppingCart, Trash2, XCircle, History, TrendingUp, Calendar, AlertTriangle, Clock, Trophy, Camera, Loader2 } from "lucide-react"
 
 import {
   getCurrentUser,
@@ -19,7 +18,10 @@ import {
   getOrders,
   getDeposits,
   isAccountFrozen,
+  uploadAvatar,
+  deleteAvatar,
   VIP_MAX_DEBT_DAYS,
+  DEBT_OVERDUE_FINE,
   type User as UserType,
   type Product as ProductType,
   type Order,
@@ -59,7 +61,6 @@ function VendingMachineContent() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
   const [isCheckoutPageOpen, setIsCheckoutPageOpen] = useState(false)
-  const [isCashPayment, setIsCashPayment] = useState(false)
   const [animatingProducts, setAnimatingProducts] = useState<AnimatingProduct[]>([])
   const [dynamicProducts, setDynamicProducts] = useState<DynamicProduct[]>([])
   const [vipProducts, setVipProducts] = useState<DynamicProduct[]>([])
@@ -67,8 +68,38 @@ function VendingMachineContent() {
   const [userDeposits, setUserDeposits] = useState<Deposit[]>([])
   const [clickingProducts, setClickingProducts] = useState<Set<string>>(new Set())
   const [isProcessingPurchase, setIsProcessingPurchase] = useState(false)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const cartButtonRef = useRef<HTMLButtonElement>(null)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+
+  const handleAvatarSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (!file || !currentUser) return
+    setIsUploadingAvatar(true)
+    try {
+      const url = await uploadAvatar(currentUser.id, file)
+      setCurrentUser({ ...currentUser, avatarUrl: url })
+    } catch (err: any) {
+      await showAlert({ message: err?.message || "Erro ao carregar imagem", type: 'error' })
+    } finally {
+      setIsUploadingAvatar(false)
+    }
+  }
+
+  const handleRemoveAvatar = async () => {
+    if (!currentUser || !currentUser.avatarUrl) return
+    setIsUploadingAvatar(true)
+    try {
+      await deleteAvatar(currentUser.id)
+      setCurrentUser({ ...currentUser, avatarUrl: null })
+    } catch (err: any) {
+      await showAlert({ message: err?.message || "Erro ao remover imagem", type: 'error' })
+    } finally {
+      setIsUploadingAvatar(false)
+    }
+  }
 
   useEffect(() => {
     const init = async () => {
@@ -302,7 +333,7 @@ function VendingMachineContent() {
       return
     }
 
-    if (!isCashPayment && isAccountFrozen(currentUser)) {
+    if (isAccountFrozen(currentUser)) {
       await showAlert({
         message: "Conta suspensa. Paga a dívida para voltar a comprar.",
         type: 'error'
@@ -319,8 +350,8 @@ function VendingMachineContent() {
         quantity: item.quantity,
       }))
 
-      const paymentMethod = isCashPayment ? 'cash' : 'balance'
-      
+      const paymentMethod: 'balance' | 'cash' = 'balance'
+
       await addOrder(currentUser.id, orderItems, paymentMethod)
 
       // Reload user data to get updated balance
@@ -376,19 +407,11 @@ function VendingMachineContent() {
 
       setCart([])
       setIsCheckoutPageOpen(false)
-      setIsCashPayment(false)
-      
-      if (paymentMethod === 'balance') {
-        await showAlert({
-          message: `Compra realizada com sucesso! ${cart.length} item(s) dispensado(s). Saldo restante: N${updatedUser?.balance.toFixed(2) || '0.00'}`,
-          type: 'success'
-        })
-      } else {
-        await showAlert({
-          message: `Compra realizada com sucesso! ${cart.length} item(s) dispensado(s).`,
-          type: 'success'
-        })
-      }
+
+      await showAlert({
+        message: `Compra realizada com sucesso! ${cart.length} item(s) dispensado(s). Saldo restante: N${updatedUser?.balance.toFixed(2) || '0.00'}`,
+        type: 'success'
+      })
     } catch (error: any) {
       console.error('Error completing purchase:', error)
       const errorMessage = error?.message || 'Erro ao completar a compra. Por favor, tente novamente.'
@@ -444,14 +467,50 @@ function VendingMachineContent() {
                   <Trophy className="w-5 h-5" />
                 </Link>
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsPopupOpen(true)}
-                className="h-10 w-10 hover:bg-slate-100"
-              >
-                <User className="w-5 h-5" />
-              </Button>
+              {currentUser ? (
+                <button
+                  type="button"
+                  onClick={() => setIsPopupOpen(true)}
+                  title="Abrir perfil"
+                  className={`flex items-center gap-2 pl-1 pr-3 h-10 rounded-full border transition-all cursor-pointer hover:shadow-md active:scale-95 ${
+                    currentUser.balance < 0
+                      ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  {currentUser.avatarUrl ? (
+                    <span className={`flex items-center justify-center w-8 h-8 rounded-full overflow-hidden ring-2 ${
+                      currentUser.balance < 0 ? 'ring-red-300' : 'ring-cyan-200'
+                    }`}>
+                      <img
+                        src={currentUser.avatarUrl}
+                        alt={currentUser.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </span>
+                  ) : (
+                    <span className={`flex items-center justify-center w-8 h-8 rounded-full text-white ${
+                      currentUser.balance < 0
+                        ? 'bg-gradient-to-br from-red-500 to-red-600'
+                        : 'bg-gradient-to-br from-cyan-500 to-blue-600'
+                    }`}>
+                      <User className="w-4 h-4" />
+                    </span>
+                  )}
+                  <span className="font-mono text-sm font-semibold tabular-nums">
+                    N{currentUser.balance.toFixed(2)}
+                  </span>
+                </button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsPopupOpen(true)}
+                  className="h-10 w-10 hover:bg-slate-100"
+                >
+                  <User className="w-5 h-5" />
+                </Button>
+              )}
               <Button
                 ref={cartButtonRef}
                 variant="ghost"
@@ -486,7 +545,7 @@ function VendingMachineContent() {
             ) : debtDaysRemaining !== null ? (
               <span className="flex items-center gap-1.5 text-amber-800">
                 <Clock className="w-4 h-4 shrink-0" />
-                <strong>{debtDaysRemaining}</strong> {debtDaysRemaining === 1 ? 'dia' : 'dias'} para pagar antes da suspensão
+                <strong>{debtDaysRemaining}</strong> {debtDaysRemaining === 1 ? 'dia' : 'dias'} para pagar. Depois, multa de N{DEBT_OVERDUE_FINE}.
               </span>
             ) : null}
           </div>
@@ -685,8 +744,50 @@ function VendingMachineContent() {
             <p className="text-slate-500 text-sm text-center mb-8">Gerencie a sua conta e histórico</p>
 
             <div className="flex items-center gap-4 mb-6 p-4 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-2xl border border-cyan-100">
-              <div className="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full p-4 shadow-lg">
-                <User className="w-8 h-8 text-white" />
+              <div className="relative shrink-0">
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarSelected}
+                />
+                <button
+                  type="button"
+                  onClick={() => !isUploadingAvatar && avatarInputRef.current?.click()}
+                  disabled={isUploadingAvatar || !currentUser}
+                  title={currentUser?.avatarUrl ? "Mudar foto" : "Carregar foto"}
+                  className="group relative w-16 h-16 rounded-full shadow-lg overflow-hidden cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {currentUser?.avatarUrl ? (
+                    <img
+                      src={currentUser.avatarUrl}
+                      alt={currentUser.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+                      <User className="w-8 h-8 text-white" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center">
+                    {isUploadingAvatar ? (
+                      <Loader2 className="w-6 h-6 text-white animate-spin" />
+                    ) : (
+                      <Camera className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    )}
+                  </div>
+                </button>
+                {currentUser?.avatarUrl && !isUploadingAvatar && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveAvatar}
+                    title="Remover foto"
+                    className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-white border border-slate-200 shadow text-slate-500 hover:text-red-600 hover:border-red-200 flex items-center justify-center"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
               <div className="flex-1">
                 <p className="font-bold text-slate-800 text-lg">{currentUser?.name || "Guest"}</p>
@@ -1014,35 +1115,10 @@ function VendingMachineContent() {
               </div>
             </div>
 
-            <div className="mb-6">
-              <div className={`flex items-center space-x-3 p-4 border-2 rounded-xl transition-all cursor-pointer ${
-                isCashPayment 
-                  ? 'border-cyan-500 bg-cyan-50 shadow-md' 
-                  : 'border-slate-200 hover:border-cyan-300 bg-white'
-              }`}
-              onClick={() => setIsCashPayment(!isCashPayment)}
-              >
-                <Checkbox
-                  id="cashPayment"
-                  checked={isCashPayment}
-                  onCheckedChange={(checked) => setIsCashPayment(checked as boolean)}
-                  className="data-[state=checked]:bg-cyan-500 data-[state=checked]:border-cyan-500"
-                />
-                <label htmlFor="cashPayment" className="text-slate-800 font-semibold cursor-pointer flex-1">
-                  Pagamento em dinheiro
-                </label>
-              </div>
-              <p className="text-xs text-slate-500 mt-2 ml-11">
-                Se selecionar pagamento em dinheiro, o saldo não será cobrado
-              </p>
+            <div className="flex justify-between items-center mb-6 text-sm p-4 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-xl border border-cyan-200 shadow-sm">
+              <span className="text-slate-600 font-medium">Saldo Disponível:</span>
+              <span className="font-bold text-slate-800 text-lg">N{currentUser?.balance.toFixed(2) || "0.00"}</span>
             </div>
-
-            {!isCashPayment && (
-              <div className="flex justify-between items-center mb-6 text-sm p-4 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-xl border border-cyan-200 shadow-sm">
-                <span className="text-slate-600 font-medium">Saldo Disponível:</span>
-                <span className="font-bold text-slate-800 text-lg">N{currentUser?.balance.toFixed(2) || "0.00"}</span>
-              </div>
-            )}
 
             <div className="space-y-4">
               <Button

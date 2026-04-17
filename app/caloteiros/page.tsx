@@ -4,12 +4,13 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { getCaloteiros, type CaloteiroEntry } from "@/lib/auth"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Trophy, TrendingDown, History, ArrowLeft } from "lucide-react"
+import { Trophy, TrendingDown, History, ArrowLeft, User, X, Clock } from "lucide-react"
 
 export default function CaloteirosPage() {
   const [byCurrentDebt, setByCurrentDebt] = useState<CaloteiroEntry[]>([])
   const [byLifetimeDebt, setByLifetimeDebt] = useState<CaloteiroEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState<CaloteiroEntry | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -22,8 +23,8 @@ export default function CaloteirosPage() {
   }, [])
 
   const formatDebt = (balance: number) =>
-    balance <= 0 ? `N${Math.abs(balance).toFixed(2)}` : "—"
-  const formatLifetime = (max: number) => (max > 0 ? `N${max.toFixed(2)}` : "—")
+    balance < 0 ? `N${Math.abs(balance).toFixed(2)}` : "—"
+  const formatLifetime = (total: number) => (total > 0 ? `N${total.toFixed(2)}` : "—")
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-cyan-50 flex flex-col">
@@ -100,41 +101,61 @@ export default function CaloteirosPage() {
                     <p className="text-sm text-slate-500 mb-4">Quem deve mais neste momento.</p>
                     <ul className="space-y-2">
                       {byCurrentDebt.slice(0, 20).map((entry, i) => (
-                        <li
-                          key={entry.id}
-                          className="flex items-center gap-3 py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100/80 transition-colors"
-                        >
-                          <span className="w-8 shrink-0 text-left text-slate-500 text-sm font-medium tabular-nums">
-                            #{i + 1}
-                          </span>
-                          <span className="flex-1 min-w-0 text-center text-slate-900 text-sm font-medium truncate" title={entry.name}>
-                            {entry.name}
-                          </span>
-                          <span className="w-16 shrink-0 text-right text-red-600 text-sm font-mono font-bold tabular-nums">
-                            {formatDebt(entry.balance)}
-                          </span>
+                        <li key={entry.id}>
+                          <button
+                            type="button"
+                            onClick={() => setSelected(entry)}
+                            className="w-full flex items-center gap-3 py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100/80 hover:shadow-sm active:scale-[0.99] cursor-pointer transition-all text-left"
+                          >
+                            <span className="w-6 shrink-0 text-slate-500 text-sm font-medium tabular-nums">
+                              #{i + 1}
+                            </span>
+                            <span className="w-8 h-8 shrink-0 rounded-full overflow-hidden bg-slate-200 flex items-center justify-center">
+                              {entry.avatarUrl ? (
+                                <img src={entry.avatarUrl} alt={entry.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <User className="w-4 h-4 text-slate-400" />
+                              )}
+                            </span>
+                            <span className="flex-1 min-w-0 text-slate-900 text-sm font-medium truncate" title={entry.name}>
+                              {entry.name}
+                            </span>
+                            <span className="w-16 shrink-0 text-right text-red-600 text-sm font-mono font-bold tabular-nums">
+                              {formatDebt(entry.balance)}
+                            </span>
+                          </button>
                         </li>
                       ))}
                     </ul>
                   </TabsContent>
 
                   <TabsContent value="lifetime" className="mt-0">
-                    <p className="text-sm text-slate-500 mb-4">Maior dívida que já tiveram (histórico).</p>
+                    <p className="text-sm text-slate-500 mb-4">Total de dívida acumulada ao longo do tempo.</p>
                     <ul className="space-y-2">
                       {byLifetimeDebt.slice(0, 20).map((entry, i) => (
-                        <li
-                          key={entry.id}
-                          className="flex items-center gap-3 py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100/80 transition-colors"
-                        >
-                          <span className="w-8 shrink-0 text-left text-slate-500 text-sm font-medium tabular-nums">
-                            #{i + 1}
-                          </span>
-                          <span className="flex-1 min-w-0 text-center text-slate-900 text-sm font-medium truncate" title={entry.name}>
-                            {entry.name}
-                          </span>
-                          <span className="w-16 shrink-0 text-right text-amber-600 text-sm font-mono font-bold tabular-nums">
-                            {formatLifetime(entry.maxDebtEver)}
-                          </span>
+                        <li key={entry.id}>
+                          <button
+                            type="button"
+                            onClick={() => setSelected(entry)}
+                            className="w-full flex items-center gap-3 py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100/80 hover:shadow-sm active:scale-[0.99] cursor-pointer transition-all text-left"
+                          >
+                            <span className="w-6 shrink-0 text-slate-500 text-sm font-medium tabular-nums">
+                              #{i + 1}
+                            </span>
+                            <span className="w-8 h-8 shrink-0 rounded-full overflow-hidden bg-slate-200 flex items-center justify-center">
+                              {entry.avatarUrl ? (
+                                <img src={entry.avatarUrl} alt={entry.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <User className="w-4 h-4 text-slate-400" />
+                              )}
+                            </span>
+                            <span className="flex-1 min-w-0 text-slate-900 text-sm font-medium truncate" title={entry.name}>
+                              {entry.name}
+                            </span>
+                            <span className="w-16 shrink-0 text-right text-amber-600 text-sm font-mono font-bold tabular-nums">
+                              {formatLifetime(entry.totalDebtEver)}
+                            </span>
+                          </button>
                         </li>
                       ))}
                     </ul>
@@ -145,6 +166,68 @@ export default function CaloteirosPage() {
           </div>
         </main>
       </div>
+
+      {selected && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-in fade-in duration-200"
+            onClick={() => setSelected(null)}
+          />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-3xl shadow-2xl w-[90vw] max-w-sm z-50 border border-slate-200 animate-in zoom-in-95 duration-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors z-10"
+              aria-label="Fechar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="bg-gradient-to-br from-slate-50 to-white p-6 pb-5 flex flex-col items-center">
+              <div className="w-24 h-24 rounded-full overflow-hidden bg-slate-200 ring-4 ring-white shadow-lg flex items-center justify-center">
+                {selected.avatarUrl ? (
+                  <img src={selected.avatarUrl} alt={selected.name} className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-10 h-10 text-slate-400" />
+                )}
+              </div>
+              <h3 className="mt-3 text-lg font-bold text-slate-900 text-center">{selected.name}</h3>
+            </div>
+
+            <div className="p-5 pt-2 space-y-2.5">
+              <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-red-50 border border-red-100">
+                <span className="text-sm text-slate-700 font-medium">Dívida atual</span>
+                <span className="text-sm font-mono font-bold text-red-600 tabular-nums">
+                  {selected.balance < 0 ? `N${Math.abs(selected.balance).toFixed(2)}` : 'Em dia'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-100">
+                <span className="text-sm text-slate-700 font-medium">Dívida de sempre</span>
+                <span className="text-sm font-mono font-bold text-amber-600 tabular-nums">
+                  N{selected.totalDebtEver.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-sm text-slate-700 font-medium">Pico histórico</span>
+                <span className="text-sm font-mono font-bold text-slate-700 tabular-nums">
+                  N{selected.maxDebtEver.toFixed(2)}
+                </span>
+              </div>
+              {selected.debtStartedAt && selected.balance < 0 && (
+                <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-sm text-slate-700 font-medium flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
+                    Em dívida há
+                  </span>
+                  <span className="text-sm font-mono font-bold text-slate-700 tabular-nums">
+                    {Math.max(0, Math.floor((Date.now() - new Date(selected.debtStartedAt).getTime()) / 86400000))} dias
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

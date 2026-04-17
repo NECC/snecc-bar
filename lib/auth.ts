@@ -14,6 +14,12 @@ export interface User {
   debtStartedAt?: string | null
   /** Largest absolute debt ever (for lifetime ranking) */
   maxDebtEver?: number
+  /** Sum of every debt increase ever — cumulative lifetime debt */
+  totalDebtEver?: number
+  /** Whether the 2€ overdue fine has already been applied this debt cycle */
+  debtFineApplied?: boolean
+  /** Public URL for profile photo (already cache-busted with ?v=timestamp) */
+  avatarUrl?: string | null
 }
 
 export interface Order {
@@ -79,7 +85,9 @@ export interface CaloteiroEntry {
   name: string
   balance: number
   maxDebtEver: number
+  totalDebtEver: number
   debtStartedAt: string | null
+  avatarUrl?: string | null
 }
 
 // Helper function to check if user is admin (based on role)
@@ -91,7 +99,10 @@ export function isAdmin(user: User | null): boolean {
 export const VIP_MAX_DEBT = 10
 
 /** Max days a VIP can stay in debt before account is frozen */
-export const VIP_MAX_DEBT_DAYS = 30
+export const VIP_MAX_DEBT_DAYS = 5
+
+/** Fine (euros) applied once when the grace period expires */
+export const DEBT_OVERDUE_FINE = 2
 
 /** Check if a VIP account is frozen (over 10€ debt or over 30 days in debt) */
 export function isAccountFrozen(user: User | null): boolean {
@@ -110,19 +121,16 @@ export async function getCurrentUser(): Promise<User | null> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const fetchRow = async () =>
+    supabase.from('users').select('*').eq('id', user.id).single()
+
+  let { data, error } = await fetchRow()
 
   if (error) {
     console.error('Error fetching user:', error)
-    // If user doesn't exist in users table, return null
     if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
       return null
     }
-    // For 406 errors, it's likely an RLS issue
     if (error.code === 'PGRST301' || error.message?.includes('406')) {
       console.error('RLS policy issue - user may not have access to users table')
     }
@@ -130,6 +138,24 @@ export async function getCurrentUser(): Promise<User | null> {
   }
 
   if (!data) return null
+
+  // If the user is in debt and the grace period may have expired, ask the DB
+  // to apply the 2€ overdue fine. The RPC is idempotent, so a second call
+  // after the fine is already applied is a no-op.
+  const balance = parseFloat(data.balance) || 0
+  const startedAt = data.debt_started_at
+  if (balance < 0 && startedAt && !data.debt_fine_applied) {
+    const days = (Date.now() - new Date(startedAt).getTime()) / (1000 * 60 * 60 * 24)
+    if (days > VIP_MAX_DEBT_DAYS) {
+      const { error: rpcError } = await supabase.rpc('apply_overdue_fine', { p_user_id: user.id })
+      if (rpcError) {
+        console.error('apply_overdue_fine failed:', rpcError)
+      } else {
+        const refreshed = await fetchRow()
+        if (!refreshed.error && refreshed.data) data = refreshed.data
+      }
+    }
+  }
 
   return {
     id: data.id,
@@ -142,6 +168,9 @@ export async function getCurrentUser(): Promise<User | null> {
     isVip: data.is_vip ?? false,
     debtStartedAt: data.debt_started_at ?? null,
     maxDebtEver: parseFloat(data.max_debt_ever) || 0,
+    totalDebtEver: parseFloat(data.total_debt_ever) || 0,
+    debtFineApplied: data.debt_fine_applied ?? false,
+    avatarUrl: data.avatar_url ?? null,
   }
 }
 
@@ -254,6 +283,9 @@ export async function getUsers(): Promise<User[]> {
     isVip: user.is_vip ?? false,
     debtStartedAt: user.debt_started_at ?? null,
     maxDebtEver: parseFloat(user.max_debt_ever) || 0,
+    totalDebtEver: parseFloat(user.total_debt_ever) || 0,
+    debtFineApplied: user.debt_fine_applied ?? false,
+    avatarUrl: user.avatar_url ?? null,
   }))
 }
 
@@ -312,29 +344,113 @@ export async function updateUser(userId: string, updates: {
   }
 }
 
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024
+
+/** Upload (or replace) a user's avatar.
+ * Enforced server-side too via the `avatars` bucket config + RLS, but we
+ * also check client-side to fail fast with a readable error. */
+export async function uploadAvatar(userId: string, file: File): Promise<string> {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('Ficheiro inválido. Apenas imagens são permitidas.')
+  }
+  if (file.size > MAX_AVATAR_BYTES) {
+    throw new Error('Imagem demasiado grande. Máximo: 2 MB.')
+  }
+
+  const path = `${userId}/avatar`
+  const { error: uploadError } = await supabase
+    .storage
+    .from('avatars')
+    .upload(path, file, { upsert: true, contentType: file.type, cacheControl: '3600' })
+
+  if (uploadError) {
+    console.error('Error uploading avatar:', uploadError)
+    throw new Error(uploadError.message || 'Erro ao carregar imagem')
+  }
+
+  const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
+  const url = `${urlData.publicUrl}?v=${Date.now()}`
+
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({ avatar_url: url })
+    .eq('id', userId)
+
+  if (updateError) {
+    console.error('Error saving avatar_url:', updateError)
+    throw new Error(updateError.message || 'Erro ao guardar imagem')
+  }
+
+  return url
+}
+
+export async function deleteAvatar(userId: string): Promise<void> {
+  const path = `${userId}/avatar`
+  const { error: removeError } = await supabase
+    .storage
+    .from('avatars')
+    .remove([path])
+
+  // We don't abort on "not found" — we still want avatar_url cleared.
+  if (removeError && !/not\s*found/i.test(removeError.message || '')) {
+    console.error('Error removing avatar:', removeError)
+    throw new Error(removeError.message || 'Erro ao remover imagem')
+  }
+
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({ avatar_url: null })
+    .eq('id', userId)
+
+  if (updateError) {
+    console.error('Error clearing avatar_url:', updateError)
+    throw new Error(updateError.message || 'Erro ao limpar imagem')
+  }
+}
+
+/** Supabase PostgREST caps a single response at `max_rows` (default 1000).
+ * Paginate with .range() to fetch every row regardless of the server cap. */
+const PAGE_SIZE = 1000
+
+async function fetchAllPaginated<T>(
+  build: () => any
+): Promise<T[]> {
+  const all: T[] = []
+  let from = 0
+  while (true) {
+    const { data, error } = await build().range(from, from + PAGE_SIZE - 1)
+    if (error) throw error
+    const rows = (data || []) as T[]
+    all.push(...rows)
+    if (rows.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+  return all
+}
+
 export async function getOrders(): Promise<Order[]> {
   try {
-    const { data: orders, error: ordersError } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        order_items (
-          id,
-          product_id,
-          quantity,
-          price_per_unit,
-          subtotal,
-          products (
-            name
+    const orders = await fetchAllPaginated<any>(() =>
+      supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (
+            id,
+            product_id,
+            quantity,
+            price_per_unit,
+            subtotal,
+            products (
+              name
+            )
           )
-        )
-      `)
-      .order('timestamp', { ascending: false })
-
-    if (ordersError) {
+        `)
+        .order('timestamp', { ascending: false })
+    ).catch((ordersError) => {
       console.error('Error fetching orders:', ordersError)
-      return []
-    }
+      return [] as any[]
+    })
 
     // Get user names
     const userIds = [...new Set((orders || []).map((o: any) => o.user_id))]
@@ -782,23 +898,16 @@ export async function getInactiveProducts(): Promise<Product[]> {
 
 export async function getDeposits(userId?: string): Promise<Deposit[]> {
   try {
-    let query = supabase
-      .from('deposits')
-      .select('*')
-      .order('timestamp', { ascending: false })
+    const data = await fetchAllPaginated<any>(() => {
+      let query = supabase
+        .from('deposits')
+        .select('*')
+        .order('timestamp', { ascending: false })
+      if (userId) query = query.eq('user_id', userId)
+      return query
+    })
 
-    if (userId) {
-      query = query.eq('user_id', userId)
-    }
-
-    const { data, error } = await query
-
-    if (error) {
-      console.error('Error fetching deposits:', error)
-      return []
-    }
-
-    return (data || []).map((d: any) => ({
+    return data.map((d: any) => ({
       id: d.id,
       userId: d.user_id,
       amount: parseFloat(d.amount) || 0,
@@ -852,16 +961,10 @@ export async function addDeposit(userId: string, amount: number, method: 'cash' 
 
 export async function getTotalDeposits(): Promise<number> {
   try {
-    const { data, error } = await supabase
-      .from('deposits')
-      .select('amount')
-
-    if (error) {
-      console.error('Error fetching total deposits:', error)
-      return 0
-    }
-
-    return (data || []).reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0)
+    const data = await fetchAllPaginated<{ amount: number | string }>(() =>
+      supabase.from('deposits').select('amount')
+    )
+    return data.reduce((sum, d) => sum + (parseFloat(d.amount as any) || 0), 0)
   } catch (error) {
     console.error('Error in getTotalDeposits:', error)
     return 0
@@ -1350,12 +1453,14 @@ export async function getCaloteiros(): Promise<{
       name: row.name || 'Anónimo',
       balance: parseFloat(row.balance) || 0,
       maxDebtEver: parseFloat(row.max_debt_ever) || 0,
+      totalDebtEver: parseFloat(row.total_debt_ever) || 0,
       debtStartedAt: row.debt_started_at ?? null,
+      avatarUrl: row.avatar_url ?? null,
     })
 
     const list = (data || []).map(mapRow)
     const byCurrentDebt = [...list].sort((a, b) => a.balance - b.balance) // most negative first
-    const byLifetimeDebt = [...list].sort((a, b) => b.maxDebtEver - a.maxDebtEver) // highest max debt first
+    const byLifetimeDebt = [...list].sort((a, b) => b.totalDebtEver - a.totalDebtEver) // highest total debt ever first
 
     return { byCurrentDebt, byLifetimeDebt }
   } catch (error) {
