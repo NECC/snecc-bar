@@ -6,8 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { LogOut, Users, ShoppingCart, Package, Calendar, TrendingUp, DollarSign, BarChart3, HelpCircle, X, Trash2, Home, Wallet, AlertTriangle } from "lucide-react"
-import { getCurrentUser, getUsers, getOrders, getProducts, updateUserBalance, addProductStock, logout, getTotalDeposits, updateProduct, addProduct, deleteProduct, restoreProduct, getInactiveProducts, updateUserMember, addDeposit, getDeposits, updateUser, isAdmin, getAvailableCash, updateAvailableCash, deleteOrder, deleteDeposit, getAvailableCashLogs, getTheftRecords, deleteTheftRecord, type User as UserType, type Order, type Product as ProductType, type Deposit, type AvailableCashLog, type TheftRecord } from "@/lib/auth"
+import { LogOut, Users, ShoppingCart, Package, Calendar, TrendingUp, DollarSign, BarChart3, HelpCircle, X, Trash2, Home, Wallet, AlertTriangle, Camera, Loader2, User as UserIcon } from "lucide-react"
+import { getCurrentUser, getUsers, getOrders, getProducts, updateUserBalance, addProductStock, logout, getTotalDeposits, updateProduct, addProduct, deleteProduct, restoreProduct, getInactiveProducts, updateUserMember, addDeposit, getDeposits, updateUser, uploadAvatar, deleteAvatar, isAdmin, getAvailableCash, updateAvailableCash, deleteOrder, deleteDeposit, getAvailableCashLogs, getTheftRecords, deleteTheftRecord, type User as UserType, type Order, type Product as ProductType, type Deposit, type AvailableCashLog, type TheftRecord } from "@/lib/auth"
 import { supabase } from "@/app/config/supabaseClient"
 import { AlertProvider, useAlert } from "@/components/ui/alert-dialog"
 
@@ -20,6 +20,7 @@ type User = {
   role?: string
   createdAt?: string
   isVip?: boolean
+  avatarUrl?: string | null
 }
 
 type Product = {
@@ -56,6 +57,8 @@ function AdminPageContent() {
   const [markAsStolen, setMarkAsStolen] = useState<boolean>(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [editingUserOriginalBalance, setEditingUserOriginalBalance] = useState<number>(0)
+  const [editingUserAvatarBusy, setEditingUserAvatarBusy] = useState(false)
+  const editingUserAvatarInputRef = useRef<HTMLInputElement>(null)
   const [selectedUserForDetails, setSelectedUserForDetails] = useState<string | null>(null)
   const [transactionFilter, setTransactionFilter] = useState<'all' | 'orders' | 'deposits' | 'cash_adjustments' | 'thefts'>('all')
   const [transactionUserFilter, setTransactionUserFilter] = useState<string>('all')
@@ -156,6 +159,7 @@ function AdminPageContent() {
       role: u.role,
       createdAt: u.createdAt,
       isVip: (u as UserType).isVip ?? false,
+      avatarUrl: (u as UserType).avatarUrl ?? null,
     })))
     const ordersData = await getOrders()
     setOrders(ordersData)
@@ -479,6 +483,13 @@ function AdminPageContent() {
   
   const expectedProfit = calculateExpectedProfit()
   const actualProfit = calculateActualProfit()
+
+  // Monsters vendidas: soma das quantidades em order_items onde o nome do produto contém "monster"
+  const monstersSold = orders.reduce((total, order) => {
+    return total + order.items.reduce((orderTotal, item) => {
+      return orderTotal + (item.productName?.toLowerCase().includes('monster') ? item.quantity : 0)
+    }, 0)
+  }, 0)
   
   const handleSaveAvailableCash = async () => {
     const amount = Number.parseFloat(availableCashInput)
@@ -633,6 +644,36 @@ function AdminPageContent() {
     setEditingUser({ ...user })
     setEditingUserOriginalBalance(user.balance)
     setSelectedUserForDetails(null) // Close details when opening edit
+  }
+
+  const handleEditingUserAvatarSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (!file || !editingUser) return
+    setEditingUserAvatarBusy(true)
+    try {
+      const url = await uploadAvatar(editingUser.id, file)
+      setEditingUser({ ...editingUser, avatarUrl: url })
+      setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, avatarUrl: url } : u))
+    } catch (err: any) {
+      await showAlert({ message: err?.message || 'Erro ao carregar imagem', type: 'error' })
+    } finally {
+      setEditingUserAvatarBusy(false)
+    }
+  }
+
+  const handleEditingUserAvatarRemove = async () => {
+    if (!editingUser || !editingUser.avatarUrl) return
+    setEditingUserAvatarBusy(true)
+    try {
+      await deleteAvatar(editingUser.id)
+      setEditingUser({ ...editingUser, avatarUrl: null })
+      setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, avatarUrl: null } : u))
+    } catch (err: any) {
+      await showAlert({ message: err?.message || 'Erro ao remover imagem', type: 'error' })
+    } finally {
+      setEditingUserAvatarBusy(false)
+    }
   }
 
   const handleSaveUser = async () => {
@@ -1042,6 +1083,56 @@ function AdminPageContent() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
+                        <div className="flex items-center gap-4 p-3 bg-slate-800/60 rounded-lg border border-slate-600">
+                          <input
+                            ref={editingUserAvatarInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleEditingUserAvatarSelected}
+                          />
+                          <div className="relative w-16 h-16 rounded-full overflow-hidden bg-slate-600 shrink-0">
+                            {editingUser.avatarUrl ? (
+                              <img src={editingUser.avatarUrl} alt={editingUser.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <UserIcon className="w-7 h-7 text-slate-300" />
+                              </div>
+                            )}
+                            {editingUserAvatarBusy && (
+                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                <Loader2 className="w-5 h-5 text-white animate-spin" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 space-y-2">
+                            <p className="text-xs text-slate-300">Foto de perfil</p>
+                            <div className="flex gap-2 flex-wrap">
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={editingUserAvatarBusy}
+                                onClick={() => editingUserAvatarInputRef.current?.click()}
+                                className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs"
+                              >
+                                <Camera className="w-3.5 h-3.5 mr-1" />
+                                {editingUser.avatarUrl ? 'Mudar' : 'Carregar'}
+                              </Button>
+                              {editingUser.avatarUrl && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={editingUserAvatarBusy}
+                                  onClick={handleEditingUserAvatarRemove}
+                                  className="text-xs border-red-500/40 text-red-300 hover:bg-red-500/10"
+                                >
+                                  Remover
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                         <Input
                           placeholder="Nome"
                           value={editingUser.name}
@@ -1171,7 +1262,18 @@ function AdminPageContent() {
                           const stats = getUserStats(user.id)
                           return (
                             <tr key={user.id} className="border-b border-slate-700">
-                              <td className="p-2">{user.name}</td>
+                              <td className="p-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-8 h-8 rounded-full overflow-hidden bg-slate-600 shrink-0 flex items-center justify-center">
+                                    {user.avatarUrl ? (
+                                      <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <UserIcon className="w-4 h-4 text-slate-300" />
+                                    )}
+                                  </span>
+                                  <span className="truncate">{user.name}</span>
+                                </div>
+                              </td>
                               <td className="p-2 text-sm">{user.email}</td>
                               <td className="p-2">N{user.balance.toFixed(2)}</td>
                               <td className="p-2">
@@ -2342,6 +2444,11 @@ function AdminPageContent() {
                       <p className="text-xl font-bold text-red-400">
                         {products.filter(p => p.stock <= 0).length}
                       </p>
+                    </div>
+                    <div className="bg-slate-700 rounded-lg p-3 md:col-span-3">
+                      <p className="text-xs text-slate-400 mb-1">Monsters Vendidas</p>
+                      <p className="text-xl font-bold text-lime-400">{monstersSold}</p>
+                      <p className="text-xs text-slate-500 mt-1">Total de latas de Monster vendidas (baseado em nome do produto)</p>
                     </div>
                   </div>
                 </div>
