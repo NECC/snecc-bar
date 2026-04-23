@@ -102,7 +102,7 @@ export const VIP_MAX_DEBT = 10
 export const VIP_MAX_DEBT_DAYS = 7
 
 /** Fine (euros) applied once when the grace period expires */
-export const DEBT_OVERDUE_FINE = 2
+export const DEBT_OVERDUE_FINE = 0
 
 /** Check if a VIP account is frozen (over 10€ debt or over 30 days in debt) */
 export function isAccountFrozen(user: User | null): boolean {
