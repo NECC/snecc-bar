@@ -139,24 +139,27 @@ export async function getCurrentUser(): Promise<User | null> {
 
   if (!data) return null
 
-  // If the user is in debt and the grace period may have expired, ask the DB
-  // to apply the 2€ overdue fine. The RPC is idempotent, so a second call
-  // after the fine is already applied is a no-op.
+    // If the user is in debt and the grace period may have expired, ask the DB
+    // to apply the 2€ overdue fine. The RPC is idempotent, so a second call
+    // after the fine is already applied is a no-op.
   const balance = parseFloat(data.balance) || 0
   const startedAt = data.debt_started_at
-  if (balance < 0 && startedAt && !data.debt_fine_applied) {
+  if (balance < 0 && startedAt && !data.account_blocked) {
     const days = (Date.now() - new Date(startedAt).getTime()) / (1000 * 60 * 60 * 24)
     if (days > VIP_MAX_DEBT_DAYS) {
-      const { error: rpcError } = await supabase.rpc('apply_overdue_fine', { p_user_id: user.id })
-      if (rpcError) {
-        console.error('apply_overdue_fine failed:', rpcError)
+      const { error: blockError } = await supabase
+        .from('users')
+        .update({ account_blocked: true })
+        .eq('id', user.id)
+      if (blockError) {
+        console.error('account block failed:', blockError)
       } else {
         const refreshed = await fetchRow()
         if (!refreshed.error && refreshed.data) data = refreshed.data
       }
     }
   }
-
+  
   return {
     id: data.id,
     email: data.email,
